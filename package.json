@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
+    "framer-motion": "^14.0.0",
+    "lucide-react": "^1.52.0",
+    "react-hook-form": "^7.89.0",
+    "react-redux": "^9.3.0",
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3"
+  }
+}
