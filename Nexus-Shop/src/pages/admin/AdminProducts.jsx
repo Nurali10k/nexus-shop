@@ -1,67 +1,216 @@
-import { useCallback, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import Button from '../../components/ui/Button'
-import Modal from '../../components/ui/Modal'
-import { addProduct, deleteProduct, updateProduct } from '../../store/slices/productsSlice'
-import { addToast } from '../../store/slices/uiSlice'
-
-const emptyProduct = { name: '', category: 'headphones', price: '', rating: '4.5', image: '', description: '', stock: '1' }
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Edit2, Trash2, X, Save, Image } from 'lucide-react';
+import { addProduct, updateProduct, deleteProduct } from '../../store/slices/productsSlice';
+import { addToast } from '../../store/slices/uiSlice';
 
 export default function AdminProducts() {
-  const dispatch = useDispatch()
-  const products = useSelector((state) => state.products.items)
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(emptyProduct)
-  const closeModal = useCallback(() => setIsOpen(false), [])
+  const dispatch = useDispatch();
+  const products = useSelector((state) => state.products.items);
+  const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    category: '',
+    price: '',
+    rating: '',
+    image: '',
+    description: '',
+    stock: ''
+  });
 
-  const openCreate = () => {
-    setEditingId(null)
-    setForm(emptyProduct)
-    setIsOpen(true)
-  }
+  const resetForm = () => {
+    setForm({ name: '', category: '', price: '', rating: '', image: '', description: '', stock: '' });
+    setEditingId(null);
+    setShowForm(false);
+  };
 
-  const openEdit = (product) => {
-    setEditingId(product.id)
-    setForm({ ...product, price: String(product.price), rating: String(product.rating), stock: String(product.stock) })
-    setIsOpen(true)
-  }
+  const handleEdit = (product) => {
+    setForm({
+      name: product.name,
+      category: product.category,
+      price: product.price.toString(),
+      rating: product.rating.toString(),
+      image: product.image,
+      description: product.description,
+      stock: product.stock?.toString() || '0'
+    });
+    setEditingId(product.id);
+    setShowForm(true);
+  };
 
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    const product = { ...form, price: Number(form.price), rating: Number(form.rating), stock: Number(form.stock) }
-    if (editingId) dispatch(updateProduct({ ...product, id: editingId }))
-    else dispatch(addProduct({ ...product, id: Date.now() }))
-    dispatch(addToast({ id: Date.now(), message: editingId ? 'Товар обновлён' : 'Товар добавлен', type: 'success' }))
-    closeModal()
-  }
+  const handleSubmit = (e) => {
+    e.preventDefault();
 
-  const handleDelete = (product) => {
-    if (!window.confirm(`Удалить товар «${product.name}»?`)) return
-    dispatch(deleteProduct(product.id))
-    dispatch(addToast({ id: Date.now(), message: 'Товар удалён', type: 'success' }))
-  }
+    const productData = {
+      name: form.name,
+      category: form.category,
+      price: parseFloat(form.price),
+      rating: parseFloat(form.rating),
+      image: form.image,
+      description: form.description,
+      stock: parseInt(form.stock) || 0
+    };
+
+    if (editingId) {
+      dispatch(updateProduct({ ...productData, id: editingId }));
+      dispatch(addToast({ message: 'Товар обновлён!', type: 'success', id: Date.now() }));
+    } else {
+      dispatch(addProduct({ ...productData, id: Date.now() }));
+      dispatch(addToast({ message: 'Товар добавлен!', type: 'success', id: Date.now() }));
+    }
+
+    resetForm();
+  };
+
+  const handleDelete = (id) => {
+    if (confirm('Удалить этот товар?')) {
+      dispatch(deleteProduct(id));
+      dispatch(addToast({ message: 'Товар удалён', type: 'info', id: Date.now() }));
+    }
+  };
 
   return (
-    <section className="page-shell">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><div><p className="mb-2 text-sm uppercase tracking-widest text-primary-600">NEXUS / ADMIN</p><h1 className="text-4xl font-bold">Товары</h1></div><Button onClick={openCreate}><Plus className="mr-1 inline" size={18} />Добавить товар</Button></div>
-      <div className="card overflow-x-auto">
-        <table className="w-full min-w-[650px] text-left text-sm">
-          <thead className="border-b border-gray-200 text-gray-500 dark:border-gray-700"><tr><th className="p-4">Товар</th><th className="p-4">Категория</th><th className="p-4">Цена</th><th className="p-4">Остаток</th><th className="p-4">Действия</th></tr></thead>
-          <tbody>{products.map((product) => <tr key={product.id} className="border-b border-gray-100 last:border-0 dark:border-gray-800"><td className="p-4 font-medium">{product.name}</td><td className="p-4 capitalize">{product.category}</td><td className="p-4">{product.price.toLocaleString('ru-RU')} ₽</td><td className="p-4">{product.stock}</td><td className="p-4"><div className="flex gap-3"><button type="button" aria-label={`Изменить ${product.name}`} onClick={() => openEdit(product)} className="text-primary-600"><Pencil size={17} /></button><button type="button" aria-label={`Удалить ${product.name}`} onClick={() => handleDelete(product)} className="text-red-500"><Trash2 size={17} /></button></div></td></tr>)}</tbody>
-        </table>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Товары ({products.length})</h2>
+        <button
+          onClick={() => { resetForm(); setShowForm(true); }}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus size={18} />
+          Добавить товар
+        </button>
       </div>
-      <Modal open={isOpen} onClose={closeModal} title={editingId ? 'Редактировать товар' : 'Новый товар'}>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="block text-sm">Название<input className="input-field mt-1" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></label>
-          <label className="block text-sm">Категория<select className="input-field mt-1" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option value="headphones">Наушники</option><option value="keyboards">Клавиатуры</option><option value="mice">Мыши</option><option value="watches">Часы</option></select></label>
-          <div className="grid grid-cols-3 gap-3"><label className="text-sm">Цена<input type="number" min="1" className="input-field mt-1" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required /></label><label className="text-sm">Рейтинг<input type="number" min="0" max="5" step="0.1" className="input-field mt-1" value={form.rating} onChange={(event) => setForm({ ...form, rating: event.target.value })} required /></label><label className="text-sm">Остаток<input type="number" min="0" className="input-field mt-1" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} required /></label></div>
-          <label className="block text-sm">Ссылка на изображение<input type="url" className="input-field mt-1" value={form.image} onChange={(event) => setForm({ ...form, image: event.target.value })} required /></label>
-          <label className="block text-sm">Описание<textarea className="input-field mt-1" rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required /></label>
-          <Button type="submit" className="w-full">Сохранить</Button>
-        </form>
-      </Modal>
-    </section>
-  )
+
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="card p-6 mb-6 overflow-hidden"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">
+                {editingId ? 'Редактировать товар' : 'Новый товар'}
+              </h3>
+              <button onClick={resetForm} className="text-gray-500 hover:text-red-500">
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Название"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="input-field"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Категория (headphones, keyboards, mice, watches)"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="input-field"
+                required
+              />
+              <input
+                type="number"
+                placeholder="Цена"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                className="input-field"
+                required
+                min="0"
+              />
+              <input
+                type="number"
+                placeholder="Рейтинг (1-5)"
+                value={form.rating}
+                onChange={(e) => setForm({ ...form, rating: e.target.value })}
+                className="input-field"
+                required
+                min="1"
+                max="5"
+                step="0.1"
+              />
+              <input
+                type="number"
+                placeholder="Количество на складе"
+                value={form.stock}
+                onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                className="input-field"
+                required
+                min="0"
+              />
+              <input
+                type="url"
+                placeholder="URL изображения"
+                value={form.image}
+                onChange={(e) => setForm({ ...form, image: e.target.value })}
+                className="input-field"
+                required
+              />
+              <textarea
+                placeholder="Описание"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="input-field md:col-span-2"
+                rows="3"
+                required
+              />
+              <div className="md:col-span-2 flex gap-2">
+                <button type="submit" className="btn-primary flex items-center gap-2">
+                  <Save size={18} />
+                  {editingId ? 'Сохранить' : 'Добавить'}
+                </button>
+                <button type="button" onClick={resetForm} className="btn-secondary">
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {products.map((product) => (
+          <motion.div
+            key={product.id}
+            layout
+            className="card p-4"
+          >
+            <img src={product.image} alt={product.name} className="w-full h-40 object-cover rounded-lg mb-3" />
+            <h3 className="font-bold truncate">{product.name}</h3>
+            <p className="text-sm text-gray-500 capitalize">{product.category}</p>
+            <div className="flex justify-between items-center mt-2">
+              <span className="font-bold text-purple-500">{product.price.toLocaleString()} ₽</span>
+              <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                ⭐ {product.rating}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">На складе: {product.stock || 0} шт.</p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => handleEdit(product)}
+                className="flex-1 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 flex items-center justify-center gap-1"
+              >
+                <Edit2 size={14} /> Изменить
+              </button>
+              <button
+                onClick={() => handleDelete(product.id)}
+                className="py-2 px-3 rounded-lg bg-red-500 text-white hover:bg-red-600"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
 }

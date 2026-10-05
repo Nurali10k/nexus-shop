@@ -1,47 +1,111 @@
-import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import Button from '../components/ui/Button'
-import { clearError, registerUser } from '../store/slices/authSlice'
-import { addToast } from '../store/slices/uiSlice'
-import { t } from '../i18n/translations'
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { motion } from 'framer-motion';
+import { register, clearError } from '../store/slices/authSlice';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
-  const dispatch = useDispatch()
-  const { error, loading, isAuthenticated } = useSelector((state) => state.auth)
-  const { language } = useSelector((state) => state.ui)
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { error, isAuthenticated } = useSelector((state) => state.auth);
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
 
-  if (isAuthenticated) return <Navigate to="/profile" replace />
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
     if (form.password !== form.confirmPassword) {
-      dispatch(clearError())
-      return
+      alert('Пароли не совпадают!');
+      return;
     }
-    const result = await dispatch(registerUser(form))
-    if (registerUser.fulfilled.match(result)) {
-      dispatch(addToast({ id: Date.now(), message: 'Аккаунт создан', type: 'success' }))
+    
+    if (form.password.length < 6) {
+      alert('Пароль должен быть минимум 6 символов!');
+      return;
     }
-  }
+    
+    dispatch(clearError());
+    dispatch(register({ name: form.name, email: form.email, password: form.password }));
+  };
 
   return (
-    <section className="page-shell flex justify-center py-14">
-      <div className="card neon-border animate-glow w-full max-w-md p-8">
-        <p className="mb-2 text-sm uppercase tracking-widest text-primary-600">NEXUS ACCOUNT</p>
-        <h1 className="mb-6 text-3xl font-bold">{t('auth.register', language)}</h1>
-        {error && <p role="alert" className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">{error}</p>}
-        {form.confirmPassword && form.password !== form.confirmPassword && <p role="alert" className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">Пароли не совпадают.</p>}
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-900 via-blue-900 to-black">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white/10 backdrop-blur-lg p-8 max-w-md w-full rounded-2xl border border-purple-500/30 shadow-2xl"
+      >
+        <h1 className="text-3xl font-bold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
+          Регистрация
+        </h1>
+        
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block text-sm">{t('auth.name', language)}<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} autoComplete="name" className="input-field mt-2" minLength="2" required /></label>
-          <label className="block text-sm">{t('auth.email', language)}<input type="email" value={form.email} onChange={(event) => { setForm({ ...form, email: event.target.value }); if (error) dispatch(clearError()) }} autoComplete="email" className="input-field mt-2" required /></label>
-          <label className="block text-sm">{t('auth.password', language)}<input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="new-password" minLength="8" className="input-field mt-2" required /></label>
-          <label className="block text-sm">Подтвердите пароль<input type="password" value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} autoComplete="new-password" minLength="8" className="input-field mt-2" required /></label>
-          <Button type="submit" disabled={loading || form.password !== form.confirmPassword} className="w-full">{loading ? t('common.loading', language) : t('auth.submit', language)}</Button>
+          <input
+            type="text"
+            placeholder="Имя"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
+            required
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
+            required
+          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Пароль (мин. 6 символов)"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+          <input
+            type="password"
+            placeholder="Подтвердите пароль"
+            value={form.confirmPassword}
+            onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
+            required
+          />
+          <button type="submit" className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/50 transition-all">
+            Зарегистрироваться →
+          </button>
         </form>
-        <p className="mt-5 text-center text-sm text-gray-500">{t('auth.haveAccount', language)} <Link to="/login" className="text-primary-600 hover:underline">{t('auth.login', language)}</Link></p>
-      </div>
-    </section>
-  )
+        
+        <p className="text-center mt-4 text-gray-400 text-sm">
+          Уже есть аккаунт?{' '}
+          <Link to="/login" className="text-purple-400 hover:underline font-semibold">
+            Войти
+          </Link>
+        </p>
+      </motion.div>
+    </div>
+  );
 }

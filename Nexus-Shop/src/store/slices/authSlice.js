@@ -1,95 +1,108 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
-import { readStorage, writeStorage } from '../storage'
+import { createSlice } from '@reduxjs/toolkit';
 
-const getUsers = () => {
-  const users = readStorage('nexusUsers', [])
-  return Array.isArray(users) ? users : []
-}
-
-const hashPassword = async (password, salt) => {
-  if (!globalThis.crypto?.subtle) throw new Error('Для входа требуется защищённый контекст браузера (HTTPS или localhost).')
-  const keyMaterial = await globalThis.crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits'],
-  )
-  const digest = await globalThis.crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 310000, hash: 'SHA-256' },
-    keyMaterial,
-    256,
-  )
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-const getCurrentUser = () => {
-  const user = readStorage('nexusCurrentUser', null)
-  if (!user || typeof user.id !== 'number' || typeof user.email !== 'string' || typeof user.name !== 'string') return null
-  return { id: user.id, email: user.email, name: user.name, role: user.role === 'admin' ? 'admin' : 'user' }
-}
-
-export const registerUser = createAsyncThunk('auth/register', async ({ name, email, password }, { rejectWithValue }) => {
-  const normalizedEmail = email.trim().toLowerCase()
-  const users = getUsers()
-  if (users.some((user) => user.email === normalizedEmail)) return rejectWithValue('Пользователь с таким email уже зарегистрирован.')
-
+const loadFromStorage = (key, defaultValue) => {
   try {
-    const salt = globalThis.crypto.randomUUID()
-    const user = {
-      id: Date.now(),
-      name: name.trim(),
-      email: normalizedEmail,
-      passwordHash: await hashPassword(password, salt),
-      salt,
-      role: 'user',
-      createdAt: new Date().toISOString(),
-    }
-    if (!writeStorage('nexusUsers', [...users, user])) throw new Error('Не удалось сохранить аккаунт в браузере.')
-    const currentUser = { id: user.id, name: user.name, email: user.email, role: user.role }
-    return currentUser
-  } catch (error) {
-    return rejectWithValue(error instanceof Error ? error.message : 'Не удалось создать аккаунт.')
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch {
+    return defaultValue;
   }
-})
+};
 
-export const loginUser = createAsyncThunk('auth/login', async ({ email, password }, { rejectWithValue }) => {
-  const normalizedEmail = email.trim().toLowerCase()
-  const user = getUsers().find((entry) => entry.email === normalizedEmail)
-  if (!user) return rejectWithValue('Аккаунт с таким email не найден. Сначала зарегистрируйтесь.')
+// Инициализация пользователей
+let users = loadFromStorage('nexus_users', []);
+if (users.length === 0) {
+  users = [{
+    id: 1,
+    name: 'Admin',
+    email: 'admin@nexus.com',
+    password: 'Nexus2026!',
+    role: 'admin',
+    createdAt: new Date().toISOString()
+  }];
+  localStorage.setItem('nexus_users', JSON.stringify(users));
+}
 
-  try {
-    if (user.passwordHash !== await hashPassword(password, user.salt)) {
-      return rejectWithValue('Неверный email или пароль.')
-    }
-    const currentUser = { id: user.id, name: user.name, email: user.email, role: user.role === 'admin' ? 'admin' : 'user' }
-    return currentUser
-  } catch (error) {
-    return rejectWithValue(error instanceof Error ? error.message : 'Не удалось выполнить вход.')
-  }
-})
+const initialState = {
+  user: loadFromStorage('nexus_current_user', null),
+  isAuthenticated: !!loadFromStorage('nexus_current_user', null),
+  error: null
+};
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState: { user: getCurrentUser(), isAuthenticated: Boolean(getCurrentUser()), error: null, loading: false },
+  initialState,
   reducers: {
-    logout: (state) => {
-      state.user = null
-      state.isAuthenticated = false
-      state.error = null
+    register: (state, action) => {
+      const { name, email, password } = action.payload;
+      users = loadFromStorage('nexus_users', []);
+      
+      const exists = users.find(u => u.email === email);
+      if (exists) {
+        state.error = 'Пользователь с таким email уже существует';
+        return;
+      }
+      
+      const newUser = {
+        id: Date.now(),
+        name,
+        email,
+        password,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      };
+      
+      users.push(newUser);
+      localStorage.setItem('nexus_users', JSON.stringify(users));
+      
+      state.user = newUser;
+      state.isAuthenticated = true;
+      state.error = null;
+      localStorage.setItem('nexus_current_user', JSON.stringify(newUser));
     },
-    clearError: (state) => { state.error = null },
-  },
-  extraReducers: (builder) => {
-    builder
-      .addCase(registerUser.pending, (state) => { state.loading = true; state.error = null })
-      .addCase(registerUser.fulfilled, (state, action) => { state.loading = false; state.user = action.payload; state.isAuthenticated = true })
-      .addCase(registerUser.rejected, (state, action) => { state.loading = false; state.error = action.payload ?? 'Не удалось создать аккаунт.' })
-      .addCase(loginUser.pending, (state) => { state.loading = true; state.error = null })
-      .addCase(loginUser.fulfilled, (state, action) => { state.loading = false; state.user = action.payload; state.isAuthenticated = true })
-      .addCase(loginUser.rejected, (state, action) => { state.loading = false; state.error = action.payload ?? 'Не удалось выполнить вход.' })
-  },
-})
+    
+    login: (state, action) => {
+      const { email, password } = action.payload;
+      users = loadFromStorage('nexus_users', []);
+      
+      const user = users.find(u => u.email === email && u.password === password);
+      
+      if (!user) {
+        state.error = 'Неверный email или пароль. Возможно, аккаунт не зарегистрирован.';
+        return;
+      }
+      
+      state.user = user;
+      state.isAuthenticated = true;
+      state.error = null;
+      localStorage.setItem('nexus_current_user', JSON.stringify(user));
+    },
+    
+    logout: (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.error = null;
+      localStorage.removeItem('nexus_current_user');
+    },
+    
+    clearError: (state) => {
+      state.error = null;
+    },
+    
+    updateProfile: (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        users = loadFromStorage('nexus_users', []);
+        const idx = users.findIndex(u => u.id === state.user.id);
+        if (idx !== -1) {
+          users[idx] = state.user;
+          localStorage.setItem('nexus_users', JSON.stringify(users));
+        }
+        localStorage.setItem('nexus_current_user', JSON.stringify(state.user));
+      }
+    }
+  }
+});
 
-export const { logout, clearError } = authSlice.actions
-export default authSlice.reducer
+export const { register, login, logout, clearError, updateProfile } = authSlice.actions;
+export default authSlice.reducer;

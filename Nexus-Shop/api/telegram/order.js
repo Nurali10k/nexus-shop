@@ -53,21 +53,15 @@ export default async function handler(request, response) {
     return response.status(400).json({ error: 'Order total does not match its items.' })
   }
 
-  const payment = order.payment === 'cash' ? 'Наличные' : 'Банковская карта'
-  const message = [
-    `<b>Новый заказ NEXUS #${order.id}</b>`,
-    '',
-    `<b>Клиент:</b> ${escapeHtml(order.name.slice(0, 100))}`,
-    `<b>Телефон:</b> ${escapeHtml(order.phone.slice(0, 40))}`,
-    `<b>Адрес:</b> ${escapeHtml(order.address.slice(0, 300))}`,
-    '',
-    '<b>Товары:</b>',
-    ...lines,
-    '',
-    `<b>Итого:</b> ${calculatedTotal.toLocaleString('ru-RU')} ₽`,
-    `<b>Оплата:</b> ${payment}`,
-    '<b>Статус:</b> Новый',
-  ].join('\n')
+  const itemsText = lines.join('\n')
+  const message = `🚀 <b>НОВЫЙ ЗАКАЗ NEXUS #${order.id}</b>\n\n` +
+    `👤 <b>Клиент:</b> ${escapeHtml(order.name.slice(0, 100))}\n` +
+    `📞 <b>Телефон:</b> ${escapeHtml(order.phone.slice(0, 40))}\n` +
+    `📍 <b>Адрес:</b> ${escapeHtml(order.address.slice(0, 300))}\n\n` +
+    `🛒 <b>Товары:</b>\n${itemsText}\n\n` +
+    `💰 <b>ИТОГО:</b> ${calculatedTotal.toLocaleString('ru-RU')} ₽\n` +
+    `💳 <b>Оплата:</b> ${order.payment === 'card' ? 'Карта' : 'Наличные'}\n` +
+    '📊 <b>Статус:</b> Новый'
 
   try {
     const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

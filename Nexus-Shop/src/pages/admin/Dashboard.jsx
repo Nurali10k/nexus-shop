@@ -1,63 +1,227 @@
-import { useDispatch, useSelector } from 'react-redux'
-import { Link } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { DollarSign, Package, ShoppingCart, Users } from 'lucide-react'
-import { ORDER_STATUSES, updateOrderStatus } from '../../store/slices/ordersSlice'
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { motion } from 'framer-motion';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ShoppingCart, DollarSign, Package, Users, TrendingUp, Filter } from 'lucide-react';
+import { updateOrderStatus, deleteOrder, setStatusFilter } from '../../store/slices/ordersSlice';
+import { addToast } from '../../store/slices/uiSlice';
+import AdminProducts from './AdminProducts';
 
-const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+const STATUSES = ['all', 'Новый', 'В сборке', 'В пути', 'Доставлен', 'Отменён'];
 
 export default function Dashboard() {
-  const dispatch = useDispatch()
-  const products = useSelector((state) => state.products.items)
-  const orders = useSelector((state) => state.orders.items)
-  const categoryData = Object.values(products.reduce((categories, product) => {
-    const current = categories[product.category] ?? { name: product.category, value: 0 }
-    current.value += 1
-    categories[product.category] = current
-    return categories
-  }, {}))
-  const revenue = orders.filter((order) => order.status !== 'Отменён').reduce((sum, order) => sum + order.total, 0)
-  const cards = [
-    { label: 'Выручка по заказам', value: `${revenue.toLocaleString('ru-RU')} ₽`, icon: DollarSign, color: 'text-green-600' },
-    { label: 'Товаров в каталоге', value: products.length, icon: Package, color: 'text-violet-600' },
-    { label: 'Заказы', value: orders.length, icon: ShoppingCart, color: 'text-cyan-600' },
-    { label: 'Тип аккаунта', value: 'Демо', icon: Users, color: 'text-orange-600' },
-  ]
+  const dispatch = useDispatch();
+  const { items: products } = useSelector((state) => state.products);
+  const orders = useSelector((state) => state.orders.items);
+  const statusFilter = useSelector((state) => state.orders.statusFilter);
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const filteredOrders = statusFilter === 'all' 
+    ? orders 
+    : orders.filter(o => o.status === statusFilter);
+
+  const stats = {
+    revenue: orders.reduce((sum, o) => sum + o.total, 0),
+    orders: orders.length,
+    products: products.length,
+    customers: new Set(orders.map(o => o.userId)).size
+  };
+
+  const categoryData = products.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  const pieData = Object.entries(categoryData).map(([name, value]) => ({ name, value }));
+
+  const statusCounts = STATUSES.filter(s => s !== 'all').map(s => ({
+    name: s,
+    count: orders.filter(o => o.status === s).length
+  }));
+
+  const handleStatusChange = (orderId, newStatus) => {
+    dispatch(updateOrderStatus({ id: orderId, status: newStatus }));
+    dispatch(addToast({ message: `Статус обновлён: ${newStatus}`, type: 'success', id: Date.now() }));
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      'Новый': 'bg-blue-500',
+      'В сборке': 'bg-yellow-500',
+      'В пути': 'bg-purple-500',
+      'Доставлен': 'bg-green-500',
+      'Отменён': 'bg-red-500'
+    };
+    return colors[status] || 'bg-gray-500';
+  };
+
+  const statCards = [
+    { icon: DollarSign, label: 'Выручка', value: `${stats.revenue.toLocaleString()} ₽`, color: 'from-green-500 to-emerald-600' },
+    { icon: ShoppingCart, label: 'Заказы', value: stats.orders, color: 'from-blue-500 to-cyan-600' },
+    { icon: Package, label: 'Товары', value: stats.products, color: 'from-purple-500 to-pink-600' },
+    { icon: Users, label: 'Клиенты', value: stats.customers, color: 'from-orange-500 to-red-600' }
+  ];
 
   return (
-    <section className="page-shell space-bg">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-sm uppercase tracking-widest text-primary-600">NEXUS / ADMIN</p><h1 className="text-4xl font-bold">Панель управления</h1></div><Link to="/admin/products" className="rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white">Управление товарами</Link></div>
-      {import.meta.env.DEV && <p role="status" className="mb-6 rounded-lg border border-amber-400/40 bg-amber-100 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">Локальный демо-режим: любой вошедший пользователь может открыть эту панель. Не используйте эту проверку как защиту в production.</p>}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, value, icon: Icon, color }) => <article key={label} className="card p-5"><Icon className={color} size={25} /><p className="mt-4 text-sm text-gray-500">{label}</p><p className="text-2xl font-bold">{value}</p></article>)}
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-4xl font-bold mb-8 neon-text">Панель управления</h1>
+
+      {/* Табы */}
+      <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">
+        {[
+          { id: 'dashboard', label: 'Статистика' },
+          { id: 'products', label: 'Товары' },
+          { id: 'orders', label: 'Заказы' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-6 py-3 font-semibold transition-all ${
+              activeTab === tab.id
+                ? 'text-purple-500 border-b-2 border-purple-500'
+                : 'text-gray-500 hover:text-purple-500'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <article className="card p-5"><h2 className="mb-4 text-lg font-bold">Количество товаров по категориям</h2><ResponsiveContainer width="100%" height={280}><BarChart data={categoryData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="value" fill="#8b5cf6" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></article>
-        <article className="card p-5"><h2 className="mb-4 text-lg font-bold">Категории каталога</h2><ResponsiveContainer width="100%" height={280}><PieChart><Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} label>{categoryData.map((item, index) => <Cell key={item.name} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></article>
-      </div>
-      <article className="card mt-8 overflow-hidden">
-        <div className="border-b border-gray-200 p-5 dark:border-gray-700"><h2 className="text-xl font-bold">Заказы и статусы</h2></div>
-        {orders.length === 0 ? <p className="p-8 text-center text-gray-500">Заказов пока нет.</p> : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {[...orders].reverse().map((order) => (
-              <div key={order.id} className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="font-semibold">Заказ #{order.id}</h3>
-                  <p className="text-sm text-gray-500">{order.name} · {order.phone} · {new Date(order.createdAt).toLocaleString()}</p>
-                  <p className="mt-1 text-sm">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}</p>
-                  <p className="mt-1 font-semibold">{order.total.toLocaleString('ru-RU')} ₽</p>
+
+      {activeTab === 'dashboard' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {statCards.map((stat, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="card p-6"
+              >
+                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-4`}>
+                  <stat.icon className="text-white" size={24} />
                 </div>
-                <label className="text-sm">Статус
-                  <select value={ORDER_STATUSES.includes(order.status) ? order.status : ORDER_STATUSES[0]} onChange={(event) => dispatch(updateOrderStatus({ id: order.id, status: event.target.value }))} className="input-field mt-1 min-w-40">
-                    {ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </label>
-              </div>
+                <p className="text-gray-500 text-sm">{stat.label}</p>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </motion.div>
             ))}
           </div>
-        )}
-      </article>
-      <p className="mt-6 text-sm text-gray-500">Данные и статусы заказов хранятся только в localStorage этого браузера; это демонстрационная панель, не подключённая к серверу.</p>
-    </section>
-  )
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="card p-6">
+              <h2 className="text-xl font-bold mb-4">Заказы по статусам</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={statusCounts}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="card p-6">
+              <h2 className="text-xl font-bold mb-4">Товары по категориям</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label>
+                    {pieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {activeTab === 'products' && <AdminProducts />}
+
+      {activeTab === 'orders' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Filter size={20} />
+            <select
+              value={statusFilter}
+              onChange={(e) => dispatch(setStatusFilter(e.target.value))}
+              className="input-field max-w-xs"
+            >
+              {STATUSES.map(s => (
+                <option key={s} value={s}>
+                  {s === 'all' ? 'Все статусы' : s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {filteredOrders.length === 0 ? (
+            <p className="text-center py-12 text-gray-500">Заказов не найдено</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredOrders.slice().reverse().map(order => (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="card p-4"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-bold">Заказ #{order.id}</h3>
+                      <p className="text-sm text-gray-500">
+                        {order.name} • {order.phone}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(order.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${getStatusColor(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div className="text-sm mb-2">
+                    {order.items.map((item, idx) => (
+                      <span key={idx} className="inline-block mr-2 text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                        {item.name} x{item.quantity}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold">{order.total.toLocaleString()} ₽</span>
+                    <div className="flex gap-2">
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className="input-field text-sm py-1"
+                      >
+                        {STATUSES.filter(s => s !== 'all').map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (confirm('Удалить заказ?')) {
+                            dispatch(deleteOrder(order.id));
+                          }
+                        }}
+                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
 }

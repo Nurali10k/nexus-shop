@@ -20,6 +20,9 @@ export default {
           600: '#0891b2',
         },
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],
