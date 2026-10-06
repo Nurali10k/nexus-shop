@@ -3,8 +3,8 @@
 // ============================================
 
 // ⚠️ ЗАМЕНИ ЭТИ ДВА ЗНАЧЕНИЯ НА СВОИ!
-const BIN_ID = 'ВСТАВЬ_СЮДА_BIN_ID';
-const API_KEY = '$2a$10$ВСТАВЬ_СЮДА_MASTER_KEY';
+const BIN_ID = '6ac48459ac6210605a17d16e ';
+const API_KEY = '$2a$10$Gb/JGw6zs7QADlK7KJjn4.wrgXnewVlTTm3PNexXPG84n5.gPI1Bm';
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
