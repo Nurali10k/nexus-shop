@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ShoppingCart, DollarSign, Package, Users, TrendingUp, Filter } from 'lucide-react';
-import { updateOrderStatus, deleteOrder, setStatusFilter } from '../../store/slices/ordersSlice';
+import { updateOrderStatus, deleteOrder, setStatusFilter, loadOrdersFromCloud } from '../../store/slices/ordersSlice';
 import { addToast } from '../../store/slices/uiSlice';
 import AdminProducts from './AdminProducts';
 
@@ -16,6 +16,13 @@ export default function Dashboard() {
   const orders = useSelector((state) => state.orders.items);
   const statusFilter = useSelector((state) => state.orders.statusFilter);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Загружаем заказы из облака при открытии админки
+  useEffect(() => {
+    dispatch(loadOrdersFromCloud());
+  }, [dispatch]);
+
+  // ... остальной код Dashboard без изменений
 
   const filteredOrders = statusFilter === 'all' 
     ? orders 

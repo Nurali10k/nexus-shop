@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { Provider, useSelector, useDispatch } from 'react-redux';
 import { useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import { store } from './store';
+import { loadOrdersFromCloud } from './store/slices/ordersSlice';
 import Header from './components/layout/Header';
 import CartDrawer from './components/cart/CartDrawer';
 import Toast from './components/ui/Toast';
@@ -20,11 +20,14 @@ import Register from './pages/Register';
 import Dashboard from './pages/admin/Dashboard';
 
 function AppContent() {
+  const dispatch = useDispatch();
   const theme = useSelector((state) => state.ui.theme);
   
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+    // Загружаем заказы из облака при старте
+    dispatch(loadOrdersFromCloud());
+  }, [theme, dispatch]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -42,8 +45,6 @@ function AppContent() {
           <Route path="/support" element={<Support />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
-          {/* 🔒 ВОТ ЗДЕСЬ ЗАЩИТА АДМИНКИ */}
           <Route 
             path="/admin" 
             element={

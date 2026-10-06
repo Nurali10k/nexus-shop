@@ -1,13 +1,19 @@
-import { useSelector } from 'react-redux';
+import { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Clock, CheckCircle, Truck, XCircle, Package } from 'lucide-react';
+import { loadOrdersFromCloud } from '../store/slices/ordersSlice';
 
 export default function MyOrders() {
+  const dispatch = useDispatch();
   const orders = useSelector((state) => state.orders.items);
   const { user } = useSelector((state) => state.auth);
 
-  // Фильтруем заказы текущего пользователя
+  useEffect(() => {
+    dispatch(loadOrdersFromCloud());
+  }, [dispatch]);
+
   const myOrders = user 
     ? orders.filter(o => o.userId === user.id)
     : orders;
@@ -83,7 +89,6 @@ export default function MyOrders() {
                 </div>
               </div>
 
-              {/* История статусов */}
               {order.statusHistory && order.statusHistory.length > 1 && (
                 <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <p className="text-xs font-bold mb-2">История:</p>
