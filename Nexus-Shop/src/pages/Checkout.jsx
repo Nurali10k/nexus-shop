@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clearCart } from '../store/slices/cartSlice';
 import { addOrder } from '../store/slices/ordersSlice';
 import { addToast } from '../store/slices/uiSlice';
-import Button from '../components/ui/Button';
 
 export default function Checkout() {
   const dispatch = useDispatch();
@@ -13,7 +12,7 @@ export default function Checkout() {
   const cartItems = useSelector((state) => state.cart.items);
   const { user } = useSelector((state) => state.auth);
   
-  const [step, setStep] = useState(1); // 1 - форма, 2 - подтверждение телефона
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: user?.name || '',
     phone: '',
@@ -38,9 +37,7 @@ export default function Checkout() {
       `📞 *Телефон:* ${order.phone}\n` +
       `📍 *Адрес:* ${order.address}\n\n` +
       `🛒 *Товары:*\n${itemsText}\n\n` +
-      `💰 *ИТОГО:* ${order.total.toLocaleString()} ₽\n` +
-      `💳 *Оплата:* ${order.payment === 'card' ? 'Карта' : 'Наличные'}\n` +
-      `📊 *Статус:* Новый`;
+      `💰 *ИТОГО:* ${order.total.toLocaleString()} ₽`;
     
     try {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -58,13 +55,10 @@ export default function Checkout() {
   };
 
   const handlePhoneVerification = () => {
-    // Генерируем 4-значный код
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedCode(code);
     setStep(2);
-    
-    // В реальном проекте здесь был бы SMS API
-    alert(`Код подтверждения: ${code}\n(В реальном проекте код придёт по SMS)`);
+    alert(`Код подтверждения: ${code}\n(В демо-версии код показан в alert)`);
   };
 
   const handleVerifyCode = () => {
@@ -87,9 +81,9 @@ export default function Checkout() {
     dispatch(addOrder(order));
     sendTelegramNotification(order);
     dispatch(clearCart());
-    dispatch(addToast({ message: 'Заказ оформлен! Уведомление отправлено.', type: 'success', id: Date.now() }));
+    dispatch(addToast({ message: 'Заказ оформлен!', type: 'success', id: Date.now() }));
 
-    setTimeout(() => navigate('/my-orders'), 1500);
+    setTimeout(() => navigate('/my-orders'), 1000);
   };
 
   if (cartItems.length === 0) {
@@ -97,31 +91,23 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Корзина пуста</h2>
-          <Button onClick={() => navigate('/shop')}>Перейти в магазин</Button>
+          <button onClick={() => navigate('/shop')} className="px-6 py-3 bg-purple-600 text-white rounded-lg">
+            Перейти в магазин
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen py-12">
+    <div className="min-h-screen py-12 bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 max-w-2xl">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card p-8"
+          className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl"
         >
-          {/* Прогресс бар */}
-          <div className="flex items-center justify-between mb-8">
-            <div className={`flex-1 h-2 rounded ${step >= 1 ? 'bg-purple-500' : 'bg-gray-300'}`} />
-            <div className={`flex-1 h-2 rounded mx-2 ${step >= 2 ? 'bg-purple-500' : 'bg-gray-300'}`} />
-          </div>
-          <div className="flex justify-between text-sm mb-8">
-            <span className={step >= 1 ? 'text-purple-500 font-bold' : 'text-gray-400'}>Данные</span>
-            <span className={step >= 2 ? 'text-purple-500 font-bold' : 'text-gray-400'}>Подтверждение</span>
-          </div>
-
-          <h1 className="text-3xl font-bold mb-6 neon-text">Оформление заказа</h1>
+          <h1 className="text-3xl font-bold mb-6">Оформление заказа</h1>
 
           <div className="mb-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
             <h3 className="font-bold mb-2">Ваш заказ:</h3>
@@ -133,7 +119,7 @@ export default function Checkout() {
             ))}
             <div className="border-t border-gray-300 dark:border-gray-600 mt-2 pt-2 flex justify-between font-bold">
               <span>Итого:</span>
-              <span className="neon-text">{total.toLocaleString()} ₽</span>
+              <span className="text-purple-600">{total.toLocaleString()} ₽</span>
             </div>
           </div>
 
@@ -152,7 +138,7 @@ export default function Checkout() {
                   placeholder="Имя"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="input-field"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                   required
                 />
                 <input
@@ -160,7 +146,7 @@ export default function Checkout() {
                   placeholder="Телефон (+996...)"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="input-field"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                   required
                 />
                 <input
@@ -168,23 +154,20 @@ export default function Checkout() {
                   placeholder="Адрес доставки"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className="input-field"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                   required
                 />
-                <div>
-                  <label className="block text-sm mb-2">Способ оплаты</label>
-                  <select
-                    value={form.payment}
-                    onChange={(e) => setForm({ ...form, payment: e.target.value })}
-                    className="input-field"
-                  >
-                    <option value="card">Банковская карта</option>
-                    <option value="cash">Наличные при получении</option>
-                  </select>
-                </div>
-                <Button type="submit" className="w-full">
+                <select
+                  value={form.payment}
+                  onChange={(e) => setForm({ ...form, payment: e.target.value })}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                >
+                  <option value="card">Банковская карта</option>
+                  <option value="cash">Наличные при получении</option>
+                </select>
+                <button type="submit" className="w-full py-3 bg-purple-600 text-white rounded-lg font-bold">
                   Продолжить →
-                </Button>
+                </button>
               </motion.form>
             ) : (
               <motion.div
@@ -196,24 +179,23 @@ export default function Checkout() {
               >
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                   <p className="text-sm">Код отправлен на номер <strong>{form.phone}</strong></p>
-                  <p className="text-xs text-gray-500 mt-1">(В демо-версии код показан в alert)</p>
                 </div>
                 <input
                   type="text"
                   placeholder="Введите 4-значный код"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
-                  className="input-field text-center text-2xl tracking-widest"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-center text-2xl tracking-widest"
                   maxLength="4"
                   required
                 />
                 <div className="flex gap-2">
-                  <Button onClick={() => setStep(1)} variant="secondary" className="flex-1">
+                  <button onClick={() => setStep(1)} className="flex-1 py-3 bg-gray-600 text-white rounded-lg">
                     Назад
-                  </Button>
-                  <Button onClick={handleVerifyCode} className="flex-1">
+                  </button>
+                  <button onClick={handleVerifyCode} className="flex-1 py-3 bg-purple-600 text-white rounded-lg font-bold">
                     Подтвердить ✓
-                  </Button>
+                  </button>
                 </div>
               </motion.div>
             )}

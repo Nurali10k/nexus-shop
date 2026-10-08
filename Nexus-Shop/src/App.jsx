@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Provider, useSelector, useDispatch } from 'react-redux';
+import { Provider } from 'react-redux';
 import { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { store } from './store';
-import { loadOrdersFromCloud } from './store/slices/ordersSlice';
+import { loadOrders } from './store/slices/ordersSlice';
 import Header from './components/layout/Header';
 import CartDrawer from './components/cart/CartDrawer';
 import Toast from './components/ui/Toast';
@@ -25,8 +26,8 @@ function AppContent() {
   
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    // Загружаем заказы из облака при старте
-    dispatch(loadOrdersFromCloud());
+    // Загружаем заказы при старте
+    dispatch(loadOrders());
   }, [theme, dispatch]);
 
   return (

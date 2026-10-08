@@ -3,9 +3,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ShoppingCart, DollarSign, Package, Users, TrendingUp, Filter } from 'lucide-react';
-import { updateOrderStatus, deleteOrder, setStatusFilter, loadOrdersFromCloud } from '../../store/slices/ordersSlice';
+import { updateOrderStatus, deleteOrder, setStatusFilter, loadOrders } from '../../store/slices/ordersSlice';
 import { addToast } from '../../store/slices/uiSlice';
-import AdminProducts from './AdminProducts';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 const STATUSES = ['all', 'Новый', 'В сборке', 'В пути', 'Доставлен', 'Отменён'];
@@ -17,12 +16,9 @@ export default function Dashboard() {
   const statusFilter = useSelector((state) => state.orders.statusFilter);
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Загружаем заказы из облака при открытии админки
   useEffect(() => {
-    dispatch(loadOrdersFromCloud());
+    dispatch(loadOrders());
   }, [dispatch]);
-
-  // ... остальной код Dashboard без изменений
 
   const filteredOrders = statusFilter === 'all' 
     ? orders 
@@ -72,13 +68,11 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8 neon-text">Панель управления</h1>
+      <h1 className="text-4xl font-bold mb-8">Панель управления</h1>
 
-      {/* Табы */}
       <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">
         {[
           { id: 'dashboard', label: 'Статистика' },
-          { id: 'products', label: 'Товары' },
           { id: 'orders', label: 'Заказы' }
         ].map(tab => (
           <button
@@ -104,7 +98,7 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
-                className="card p-6"
+                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
               >
                 <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-4`}>
                   <stat.icon className="text-white" size={24} />
@@ -116,7 +110,7 @@ export default function Dashboard() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
-            <div className="card p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
               <h2 className="text-xl font-bold mb-4">Заказы по статусам</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={statusCounts}>
@@ -129,7 +123,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
 
-            <div className="card p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
               <h2 className="text-xl font-bold mb-4">Товары по категориям</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -146,8 +140,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {activeTab === 'products' && <AdminProducts />}
-
       {activeTab === 'orders' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="flex items-center gap-2 mb-4">
@@ -155,7 +147,7 @@ export default function Dashboard() {
             <select
               value={statusFilter}
               onChange={(e) => dispatch(setStatusFilter(e.target.value))}
-              className="input-field max-w-xs"
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
             >
               {STATUSES.map(s => (
                 <option key={s} value={s}>
@@ -174,7 +166,7 @@ export default function Dashboard() {
                   key={order.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="card p-4"
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -205,7 +197,7 @@ export default function Dashboard() {
                       <select
                         value={order.status}
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className="input-field text-sm py-1"
+                        className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
                       >
                         {STATUSES.filter(s => s !== 'all').map(s => (
                           <option key={s} value={s}>{s}</option>
@@ -217,7 +209,7 @@ export default function Dashboard() {
                             dispatch(deleteOrder(order.id));
                           }
                         }}
-                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600"
                       >
                         Удалить
                       </button>

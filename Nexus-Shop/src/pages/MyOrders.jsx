@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Clock, CheckCircle, Truck, XCircle, Package } from 'lucide-react';
-import { loadOrdersFromCloud } from '../store/slices/ordersSlice';
+import { loadOrders } from '../store/slices/ordersSlice';
 
 export default function MyOrders() {
   const dispatch = useDispatch();
@@ -11,7 +11,7 @@ export default function MyOrders() {
   const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    dispatch(loadOrdersFromCloud());
+    dispatch(loadOrders());
   }, [dispatch]);
 
   const myOrders = user 
@@ -46,7 +46,7 @@ export default function MyOrders() {
         <div className="text-center">
           <ShoppingBag size={80} className="mx-auto text-gray-300 mb-4" />
           <h1 className="text-3xl font-bold mb-4">У вас нет заказов</h1>
-          <Link to="/shop" className="btn-primary inline-block">
+          <Link to="/shop" className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg">
             Перейти в магазин
           </Link>
         </div>
@@ -55,12 +55,12 @@ export default function MyOrders() {
   }
 
   return (
-    <div className="min-h-screen py-12">
+    <div className="min-h-screen py-12 bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 max-w-4xl">
         <motion.h1
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-4xl font-bold mb-8 neon-text"
+          className="text-4xl font-bold mb-8"
         >
           Мои заказы ({myOrders.length})
         </motion.h1>
@@ -72,7 +72,7 @@ export default function MyOrders() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="card p-6"
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -116,7 +116,7 @@ export default function MyOrders() {
                   <p className="text-sm text-gray-500">{order.name} • {order.phone}</p>
                   <p className="text-xs text-gray-400">{order.address}</p>
                 </div>
-                <span className="text-xl font-bold neon-text">{order.total.toLocaleString()} ₽</span>
+                <span className="text-xl font-bold text-purple-600">{order.total.toLocaleString()} ₽</span>
               </div>
             </motion.div>
           ))}
