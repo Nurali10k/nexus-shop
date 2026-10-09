@@ -21,20 +21,28 @@ export default function MyOrders() {
       import('firebase/auth')
     ]).then(async ([{ subscribeToOrders }, { auth }, { signInAnonymously }]) => {
       await auth.authStateReady();
-      if (!auth.currentUser) await signInAnonymously(auth);
+      let user = auth.currentUser;
+      if (!user) {
+        const credential = await signInAnonymously(auth);
+        user = credential.user;
+      }
+      if (!user) {
+        throw new Error('Firebase не вернул авторизованного пользователя.');
+      }
       if (!active) return;
-      setFirebaseUser(auth.currentUser);
+      setFirebaseUser(user);
       unsubscribe = subscribeToOrders(
         (items) => dispatch(replaceOrders(items)),
         (error) => dispatch(addToast({
           message: `Не удалось загрузить заказы: ${error.message}`,
           type: 'error'
-        }))
+        })),
+        user
       );
     }).catch((error) => {
       dispatch(addToast({
         message: error.code === 'auth/operation-not-allowed'
-          ? 'Гостевой вход отключён. Войдите через Google или включите Anonymous в Firebase Authentication.'
+          ? 'Гостевой вход отключён в Firebase. Включите Authentication → Sign-in method → Anonymous.'
           : `Не удалось подключиться к Firestore: ${error.message}`,
         type: 'error'
       }));

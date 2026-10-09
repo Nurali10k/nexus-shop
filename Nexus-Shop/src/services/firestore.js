@@ -70,8 +70,7 @@ export const deleteProductFromFirestore = async (id) => {
 };
 
 // ===== ЗАКАЗЫ =====
-const getVisibleOrdersQuery = () => {
-  const user = auth.currentUser;
+const getVisibleOrdersQuery = (user = auth.currentUser) => {
   if (!user) {
     throw new Error('Войдите через Firebase, чтобы просматривать заказы.');
   }
@@ -90,10 +89,10 @@ export const getOrdersFromFirestore = async () => {
   }));
 };
 
-export const subscribeToOrders = (onData, onError) => {
+export const subscribeToOrders = (onData, onError, user = auth.currentUser) => {
   let ordersQuery;
   try {
-    ordersQuery = getVisibleOrdersQuery();
+    ordersQuery = getVisibleOrdersQuery(user);
   } catch (error) {
     onError(error);
     return () => {};

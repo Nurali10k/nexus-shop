@@ -33,8 +33,15 @@ export default function Login() {
       dispatch(loginWithGoogle({ name: user.displayName, email: user.email, avatar: user.photoURL }));
       dispatch(addToast({ message: `Добро пожаловать, ${user.displayName}!`, type: 'success' }));
     } catch (error) {
-      console.error(error);
-      dispatch(addToast({ message: 'Ошибка входа через Google', type: 'error' }));
+      const messages = {
+        'auth/unauthorized-domain': `Домен ${window.location.hostname} не разрешён в Firebase. Добавьте его в Authentication → Settings → Authorized domains.`,
+        'auth/popup-blocked': 'Браузер заблокировал окно Google. Разрешите всплывающие окна для сайта и проверьте Authorized domains в настройках Firebase.',
+        'auth/popup-closed-by-user': 'Окно входа Google было закрыто до завершения авторизации.'
+      };
+      dispatch(addToast({
+        message: messages[error.code] || `Не удалось войти через Google: ${error.message}`,
+        type: 'error'
+      }));
     }
   };
 
