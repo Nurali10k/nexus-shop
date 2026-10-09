@@ -1,22 +1,54 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Clock, CheckCircle, Truck, XCircle, Package } from 'lucide-react';
-import { loadOrders } from '../store/slices/ordersSlice';
+import { replaceOrders } from '../store/slices/ordersSlice';
+import { addToast } from '../store/slices/uiSlice';
 
 export default function MyOrders() {
   const dispatch = useDispatch();
   const orders = useSelector((state) => state.orders.items);
-  const { user } = useSelector((state) => state.auth);
+  const [firebaseUser, setFirebaseUser] = useState(null);
 
   useEffect(() => {
-    dispatch(loadOrders());
+    let active = true;
+    let unsubscribe = () => {};
+
+    Promise.all([
+      import('../services/firestore'),
+      import('../firebase'),
+      import('firebase/auth')
+    ]).then(async ([{ subscribeToOrders }, { auth }, { signInAnonymously }]) => {
+      await auth.authStateReady();
+      if (!auth.currentUser) await signInAnonymously(auth);
+      if (!active) return;
+      setFirebaseUser(auth.currentUser);
+      unsubscribe = subscribeToOrders(
+        (items) => dispatch(replaceOrders(items)),
+        (error) => dispatch(addToast({
+          message: `Не удалось загрузить заказы: ${error.message}`,
+          type: 'error'
+        }))
+      );
+    }).catch((error) => {
+      dispatch(addToast({
+        message: error.code === 'auth/operation-not-allowed'
+          ? 'Гостевой вход отключён. Войдите через Google или включите Anonymous в Firebase Authentication.'
+          : `Не удалось подключиться к Firestore: ${error.message}`,
+        type: 'error'
+      }));
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [dispatch]);
 
-  const myOrders = user 
-    ? orders.filter(o => o.userId === user.id)
-    : orders;
+  const myOrders = firebaseUser?.email === 'admin@nexus.com'
+    ? orders
+    : orders.filter(order => order.userId === firebaseUser?.uid);
 
   const getStatusIcon = (status) => {
     const icons = {

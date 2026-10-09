@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
-import { Camera, User, Mail, Shield, Award, BookOpen, TrendingUp, Save, LogOut } from 'lucide-react';
+import { Camera, User, Mail, Save, LogOut, Upload } from 'lucide-react';
 import { updateUser, logout } from '../store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,6 +17,18 @@ export default function Profile() {
     bio: user?.bio || ''
   });
   const [preview, setPreview] = useState(user?.avatar || null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name: user.name || '',
+        email: user.email || '',
+        bio: user.bio || ''
+      });
+      setPreview(user.avatar || null);
+    }
+  }, [user]);
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -35,6 +47,7 @@ export default function Profile() {
   const handleSave = (e) => {
     e.preventDefault();
     dispatch(updateUser(form));
+    setIsEditing(false);
     alert('Профиль сохранён!');
   };
 
@@ -45,8 +58,8 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Загрузка...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <p className="text-white">Загрузка...</p>
       </div>
     );
   }
@@ -58,10 +71,8 @@ export default function Profile() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative h-48 rounded-3xl overflow-hidden mb-20"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700" />
-        </motion.div>
+          className="relative h-48 rounded-3xl overflow-hidden mb-20 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600"
+        />
 
         {/* Avatar */}
         <motion.div
@@ -75,7 +86,7 @@ export default function Profile() {
               {preview ? (
                 <img src={preview} alt="" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-5xl font-bold text-white">
+                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-cyan-600 flex items-center justify-center text-5xl font-bold text-white">
                   {user?.name?.[0]?.toUpperCase() || 'U'}
                 </div>
               )}
@@ -84,7 +95,7 @@ export default function Profile() {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => fileInputRef.current?.click()}
-              className="absolute -bottom-2 -right-2 w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg border-4 border-white dark:border-gray-900"
+              className="absolute -bottom-2 -right-2 w-12 h-12 bg-gradient-to-br from-purple-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg border-4 border-white dark:border-gray-900"
             >
               <Camera className="text-white" size={20} />
             </motion.button>
@@ -108,8 +119,7 @@ export default function Profile() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{user?.name}</h1>
           <p className="text-gray-500">{user?.email}</p>
           <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-            user?.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-            'bg-blue-100 text-blue-700'
+            user?.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
           }`}>
             {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
           </span>
@@ -123,9 +133,9 @@ export default function Profile() {
           className="grid grid-cols-3 gap-4 mb-8"
         >
           {[
-            { icon: Award, label: 'Рейтинг', value: `⭐ ${user?.rating || 5}`, color: 'from-yellow-500 to-orange-500' },
-            { icon: Shield, label: 'Роль', value: user?.role === 'admin' ? 'Админ' : 'Юзер', color: 'from-purple-500 to-pink-500' },
-            { icon: TrendingUp, label: 'Статус', value: 'Активен', color: 'from-green-500 to-emerald-500' }
+            { label: 'Рейтинг', value: `⭐ ${user?.rating || 5}`, color: 'from-yellow-500 to-orange-500' },
+            { label: 'Роль', value: user?.role === 'admin' ? 'Админ' : 'Юзер', color: 'from-purple-500 to-pink-500' },
+            { label: 'Статус', value: 'Активен', color: 'from-green-500 to-emerald-500' }
           ].map((stat, idx) => (
             <motion.div
               key={idx}
@@ -133,7 +143,7 @@ export default function Profile() {
               className="bg-white dark:bg-gray-800 rounded-2xl p-4 text-center shadow-lg"
             >
               <div className={`w-12 h-12 mx-auto mb-2 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                <stat.icon className="text-white" size={24} />
+                <User className="text-white" size={24} />
               </div>
               <div className="text-lg font-bold text-gray-900 dark:text-white">{stat.value}</div>
               <div className="text-xs text-gray-500">{stat.label}</div>
@@ -148,10 +158,20 @@ export default function Profile() {
           transition={{ delay: 0.5 }}
           className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
         >
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <User size={20} className="text-purple-500" />
-            Редактировать профиль
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <User size={20} className="text-purple-500" />
+              Редактировать профиль
+            </h2>
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg text-sm font-medium hover:bg-purple-500/30 transition-colors"
+              >
+                Редактировать
+              </button>
+            )}
+          </div>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">Имя</label>
@@ -161,7 +181,8 @@ export default function Profile() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  disabled={!isEditing}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -173,7 +194,8 @@ export default function Profile() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  disabled={!isEditing}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -182,33 +204,51 @@ export default function Profile() {
               <textarea
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                disabled={!isEditing}
                 rows="3"
                 placeholder="Расскажите о себе..."
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
-            <div className="flex gap-2">
-              <motion.button
-                type="submit"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl flex items-center justify-center gap-2"
-              >
-                <Save size={18} />
-                Сохранить
-              </motion.button>
-              <motion.button
-                type="button"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleLogout}
-                className="px-6 py-3 bg-red-500 text-white font-bold rounded-xl flex items-center gap-2"
-              >
-                <LogOut size={18} />
-                Выйти
-              </motion.button>
-            </div>
+            {isEditing && (
+              <div className="flex gap-2">
+                <motion.button
+                  type="submit"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Save size={18} />
+                  Сохранить
+                </motion.button>
+                <motion.button
+                  type="button"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setIsEditing(false)}
+                  className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
+                >
+                  Отмена
+                </motion.button>
+              </div>
+            )}
           </form>
+        </motion.div>
+
+        {/* Logout */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-6 text-center"
+        >
+          <button
+            onClick={handleLogout}
+            className="px-6 py-3 bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition-colors flex items-center gap-2 mx-auto"
+          >
+            <LogOut size={18} />
+            Выйти из аккаунта
+          </button>
         </motion.div>
       </div>
     </div>

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, X, Save, Image } from 'lucide-react';
-import { addProduct, updateProduct, deleteProduct } from '../../store/slices/productsSlice';
+import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import { addToast } from '../../store/slices/uiSlice';
+import { replaceProducts, createProduct, updateProduct, removeProduct } from '../../store/slices/productsSlice';
 
 export default function AdminProducts() {
   const dispatch = useDispatch();
@@ -19,6 +19,38 @@ export default function AdminProducts() {
     description: '',
     stock: ''
   });
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe = () => {};
+
+    Promise.all([
+      import('../../services/firestore'),
+      import('../../firebase')
+    ]).then(async ([{ subscribeToProducts, seedDefaultProductsIfEmpty }, { auth }]) => {
+      if (!active) return;
+      await auth.authStateReady();
+      if (auth.currentUser?.email === 'admin@nexus.com') {
+        try {
+          await seedDefaultProductsIfEmpty();
+        } catch (error) {
+          dispatch(addToast({ message: `Не удалось заполнить каталог: ${error.message}`, type: 'error' }));
+        }
+      }
+      if (!active) return;
+      unsubscribe = subscribeToProducts(
+        (items) => dispatch(replaceProducts(items)),
+        (error) => dispatch(addToast({ message: `Не удалось загрузить товары: ${error.message}`, type: 'error' }))
+      );
+    }).catch((error) => {
+      dispatch(addToast({ message: `Не удалось подключиться к Firestore: ${error.message}`, type: 'error' }));
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [dispatch]);
 
   const resetForm = () => {
     setForm({ name: '', category: '', price: '', rating: '', image: '', description: '', stock: '' });
@@ -40,7 +72,7 @@ export default function AdminProducts() {
     setShowForm(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const productData = {
@@ -53,21 +85,36 @@ export default function AdminProducts() {
       stock: parseInt(form.stock) || 0
     };
 
-    if (editingId) {
-      dispatch(updateProduct({ ...productData, id: editingId }));
-      dispatch(addToast({ message: 'Товар обновлён!', type: 'success', id: Date.now() }));
-    } else {
-      dispatch(addProduct({ ...productData, id: Date.now() }));
-      dispatch(addToast({ message: 'Товар добавлен!', type: 'success', id: Date.now() }));
+    try {
+      if (editingId) {
+        await dispatch(updateProduct({ id: editingId, ...productData })).unwrap();
+        dispatch(addToast({ message: 'Товар обновлён!', type: 'success', id: Date.now() }));
+      } else {
+        await dispatch(createProduct(productData)).unwrap();
+        dispatch(addToast({ message: 'Товар добавлен!', type: 'success', id: Date.now() }));
+      }
+      resetForm();
+    } catch (error) {
+      dispatch(addToast({
+        message: `Не удалось сохранить товар: ${error.message}`,
+        type: 'error',
+        id: Date.now()
+      }));
     }
-
-    resetForm();
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Удалить этот товар?')) {
-      dispatch(deleteProduct(id));
-      dispatch(addToast({ message: 'Товар удалён', type: 'info', id: Date.now() }));
+      try {
+        await dispatch(removeProduct(id)).unwrap();
+        dispatch(addToast({ message: 'Товар удалён', type: 'info', id: Date.now() }));
+      } catch (error) {
+        dispatch(addToast({
+          message: `Не удалось удалить товар: ${error.message}`,
+          type: 'error',
+          id: Date.now()
+        }));
+      }
     }
   };
 

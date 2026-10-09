@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clearCart } from '../store/slices/cartSlice';
-import { addOrder } from '../store/slices/ordersSlice';
+import { createOrder } from '../store/slices/ordersSlice';
 import { addToast } from '../store/slices/uiSlice';
 
 export default function Checkout() {
@@ -24,36 +24,6 @@ export default function Checkout() {
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const sendTelegramNotification = async (order) => {
-    const BOT_TOKEN = '8616800297:AAEc2fnbm-DyFOROL3gK12y-IMHgr52C5ZM';
-    const CHAT_ID = '8234364151';
-    
-    const itemsText = order.items
-      .map(i => `• ${i.name} (${i.quantity} шт.) — ${i.price * i.quantity} ₽`)
-      .join('\n');
-    
-    const message = `🚀 *НОВЫЙ ЗАКАЗ NEXUS #${order.id}*\n\n` +
-      `👤 *Клиент:* ${order.name}\n` +
-      `📞 *Телефон:* ${order.phone}\n` +
-      `📍 *Адрес:* ${order.address}\n\n` +
-      `🛒 *Товары:*\n${itemsText}\n\n` +
-      `💰 *ИТОГО:* ${order.total.toLocaleString()} ₽`;
-    
-    try {
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: message,
-          parse_mode: 'Markdown'
-        })
-      });
-    } catch (error) {
-      console.error('Telegram error:', error);
-    }
-  };
-
   const handlePhoneVerification = () => {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedCode(code);
@@ -61,15 +31,14 @@ export default function Checkout() {
     alert(`Код подтверждения: ${code}\n(В демо-версии код показан в alert)`);
   };
 
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
     if (verificationCode !== generatedCode) {
       alert('Неверный код!');
       return;
     }
 
     const order = {
-      id: Date.now(),
-      userId: user?.id || null,
+      localUserId: user?.id || null,
       ...form,
       items: cartItems,
       total,
@@ -78,12 +47,26 @@ export default function Checkout() {
       createdAt: new Date().toISOString()
     };
 
-    dispatch(addOrder(order));
-    sendTelegramNotification(order);
-    dispatch(clearCart());
-    dispatch(addToast({ message: 'Заказ оформлен!', type: 'success', id: Date.now() }));
+    try {
+      const { auth } = await import('../firebase');
+      await auth.authStateReady();
+      if (!auth.currentUser) {
+        const { signInAnonymously } = await import('firebase/auth');
+        await signInAnonymously(auth);
+      }
+      await dispatch(createOrder(order)).unwrap();
+      dispatch(clearCart());
+      dispatch(addToast({ message: 'Заказ оформлен!', type: 'success' }));
 
-    setTimeout(() => navigate('/my-orders'), 1000);
+      setTimeout(() => navigate('/my-orders'), 1000);
+    } catch (error) {
+      dispatch(addToast({
+        message: error.code === 'auth/operation-not-allowed'
+          ? 'Гостевой вход отключён в Firebase. Включите Anonymous в Authentication → Sign-in method.'
+          : `Не удалось оформить заказ: ${error.message}`,
+        type: 'error'
+      }));
+    }
   };
 
   if (cartItems.length === 0) {

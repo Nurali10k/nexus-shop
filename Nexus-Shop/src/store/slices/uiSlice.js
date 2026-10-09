@@ -1,20 +1,31 @@
-import { createSlice } from '@reduxjs/toolkit'
-import { readStorage } from '../storage'
+import { createSlice } from '@reduxjs/toolkit';
+
+const initialState = {
+  theme: localStorage.getItem('nexus_theme') || 'dark',
+  language: localStorage.getItem('nexus_lang') || 'ru',
+  toasts: []
+};
 
 const uiSlice = createSlice({
   name: 'ui',
-  initialState: {
-    theme: readStorage('theme', 'dark') === 'light' ? 'light' : 'dark',
-    language: ['ru', 'en', 'kg'].includes(readStorage('language', 'ru')) ? readStorage('language', 'ru') : 'ru',
-    toasts: [],
-  },
+  initialState,
   reducers: {
-    setTheme: (state, action) => { state.theme = action.payload },
-    setLanguage: (state, action) => { state.language = action.payload },
-    addToast: (state, action) => { state.toasts.push({ id: Date.now(), ...action.payload }) },
-    removeToast: (state, action) => { state.toasts = state.toasts.filter((toast) => toast.id !== action.payload) },
-  },
-})
+    setTheme: (state, action) => {
+      state.theme = action.payload;
+      localStorage.setItem('nexus_theme', action.payload);
+    },
+    setLanguage: (state, action) => {
+      state.language = action.payload;
+      localStorage.setItem('nexus_lang', action.payload);
+    },
+    addToast: (state, action) => {
+      state.toasts.push({ id: Date.now(), ...action.payload });
+    },
+    removeToast: (state, action) => {
+      state.toasts = state.toasts.filter(t => t.id !== action.payload);
+    }
+  }
+});
 
-export const { setTheme, setLanguage, addToast, removeToast } = uiSlice.actions
-export default uiSlice.reducer
+export const { setTheme, setLanguage, addToast, removeToast } = uiSlice.actions;
+export default uiSlice.reducer;

@@ -1,33 +1,52 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const loadFromStorage = (key, defaultValue) => {
+const getWishlist = () => {
   try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaultValue;
+    return JSON.parse(localStorage.getItem('nexus_wishlist') || '[]');
   } catch {
-    return defaultValue;
+    return [];
   }
 };
 
+const saveWishlist = (items) => {
+  localStorage.setItem('nexus_wishlist', JSON.stringify(items));
+};
+
 const initialState = {
-  items: loadFromStorage('nexus_wishlist', [])
+  items: getWishlist()
 };
 
 const wishlistSlice = createSlice({
   name: 'wishlist',
   initialState,
   reducers: {
-    toggleWishlist: (state, action) => {
-      const exists = state.items.find(i => i.id === action.payload.id);
-      if (exists) {
-        state.items = state.items.filter(i => i.id !== action.payload.id);
-      } else {
+    addToWishlist: (state, action) => {
+      const exists = state.items.find(item => item?.id === action.payload.id);
+      if (!exists) {
         state.items.push(action.payload);
+        saveWishlist(state.items);
       }
-      localStorage.setItem('nexus_wishlist', JSON.stringify(state.items));
+    },
+    toggleWishlist: (state, action) => {
+      const exists = state.items.some(item => item?.id === action.payload.id);
+      state.items = exists
+        ? state.items.filter(item => item?.id !== action.payload.id)
+        : [...state.items, action.payload];
+      saveWishlist(state.items);
+    },
+    removeFromWishlist: (state, action) => {
+      state.items = state.items.filter(item => item?.id !== action.payload);
+      saveWishlist(state.items);
+    },
+    clearWishlist: (state) => {
+      state.items = [];
+      localStorage.removeItem('nexus_wishlist');
+    },
+    loadWishlist: (state) => {
+      state.items = getWishlist();
     }
   }
 });
 
-export const { toggleWishlist } = wishlistSlice.actions;
+export const { addToWishlist, toggleWishlist, removeFromWishlist, clearWishlist, loadWishlist } = wishlistSlice.actions;
 export default wishlistSlice.reducer;

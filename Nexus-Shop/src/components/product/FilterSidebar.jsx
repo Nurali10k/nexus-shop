@@ -1,34 +1,134 @@
-import { useDispatch, useSelector } from 'react-redux'
-import { setFilters } from '../../store/slices/productsSlice'
-import { t } from '../../i18n/translations'
+import { createSlice } from '@reduxjs/toolkit';
 
-const categories = ['all', 'headphones', 'keyboards', 'mice', 'watches']
+const getProducts = () => {
+  try {
+    const stored = localStorage.getItem('nexus_products');
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+};
 
-export default function FilterSidebar() {
-  const dispatch = useDispatch()
-  const { filters } = useSelector((state) => state.products)
-  const language = useSelector((state) => state.ui.language)
+const saveProducts = (products) => {
+  localStorage.setItem('nexus_products', JSON.stringify(products));
+};
 
-  return (
-    <aside className="card h-fit p-5">
-      <h2 className="mb-4 text-lg font-semibold">{t('shop.filter', language)}</h2>
-      <h3 className="mb-2 text-sm font-medium text-gray-500">{t('shop.category', language)}</h3>
-      <div className="space-y-1">
-        {categories.map((category) => (
-          <button
-            type="button"
-            key={category}
-            onClick={() => dispatch(setFilters({ category }))}
-            className={`w-full rounded-lg px-3 py-2 text-left capitalize ${filters.category === category ? 'bg-primary-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          >
-            {category === 'all' ? t('shop.all', language) : category}
-          </button>
-        ))}
-      </div>
-      <label className="mt-5 block text-sm font-medium" htmlFor="min-rating">{t('shop.rating', language)}: {filters.rating}+</label>
-      <input id="min-rating" type="range" min="0" max="5" step="0.5" value={filters.rating} onChange={(event) => dispatch(setFilters({ rating: Number(event.target.value) }))} className="mt-2 w-full accent-violet-600" />
-      <label className="mt-5 block text-sm font-medium" htmlFor="max-price">{t('shop.price', language)}: до {filters.priceRange[1].toLocaleString('ru-RU')} ₽</label>
-      <input id="max-price" type="range" min="10000" max="100000" step="5000" value={filters.priceRange[1]} onChange={(event) => dispatch(setFilters({ priceRange: [filters.priceRange[0], Number(event.target.value)] }))} className="mt-2 w-full accent-violet-600" />
-    </aside>
-  )
-}
+const defaultProducts = [
+  {
+    id: 1,
+    name: 'Sony WH-1000XM5',
+    category: 'headphones',
+    price: 34990,
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=500&q=80',
+    description: 'Премиальные беспроводные наушники с лучшим шумоподавлением в классе. 30 часов работы от батареи.',
+    stock: 15
+  },
+  {
+    id: 2,
+    name: 'Keychron K2 Pro',
+    category: 'keyboards',
+    price: 12500,
+    rating: 4.8,
+    image: 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=500&q=80',
+    description: 'Механическая клавиатура с горячей заменой свичей. Bluetooth и проводное подключение.',
+    stock: 8
+  },
+  {
+    id: 3,
+    name: 'Logitech G Pro X',
+    category: 'mice',
+    price: 11990,
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&q=80',
+    description: 'Игровая мышь с сенсором HERO 25K. Ультралёгкий дизайн для киберспорта.',
+    stock: 20
+  },
+  {
+    id: 4,
+    name: 'Apple Watch Ultra 2',
+    category: 'watches',
+    price: 79990,
+    rating: 5.0,
+    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&q=80',
+    description: 'Умные часы для экстремальных видов спорта. Титановый корпус, GPS, водозащита 100м.',
+    stock: 5
+  },
+  {
+    id: 5,
+    name: 'Marshall Major IV',
+    category: 'headphones',
+    price: 10990,
+    rating: 4.7,
+    image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500&q=80',
+    description: 'Классические наушники в ретро-дизайне. 80+ часов работы от батареи.',
+    stock: 12
+  },
+  {
+    id: 6,
+    name: 'Razer DeathAdder V3',
+    category: 'mice',
+    price: 8490,
+    rating: 4.8,
+    image: 'https://images.unsplash.com/photo-1563191911-e65f8655ebf9?w=500&q=80',
+    description: 'Эргономичная игровая мышь с оптическим сенсором Focus Pro 30K.',
+    stock: 18
+  }
+];
+
+const initialState = {
+  items: getProducts() || defaultProducts,
+  filter: 'all',
+  searchQuery: '',
+  sortBy: 'popular'
+};
+
+const productsSlice = createSlice({
+  name: 'products',
+  initialState,
+  reducers: {
+    setFilter: (state, action) => {
+      state.filter = action.payload;
+    },
+    setFilters: (state, action) => {
+      state.filter = action.payload;
+    },
+    setSearchQuery: (state, action) => {
+      state.searchQuery = action.payload;
+    },
+    setSortBy: (state, action) => {
+      state.sortBy = action.payload;
+    },
+    addProduct: (state, action) => {
+      state.items.push(action.payload);
+      saveProducts(state.items);
+    },
+    updateProduct: (state, action) => {
+      const idx = state.items.findIndex(p => p.id === action.payload.id);
+      if (idx !== -1) {
+        state.items[idx] = action.payload;
+        saveProducts(state.items);
+      }
+    },
+    deleteProduct: (state, action) => {
+      state.items = state.items.filter(p => p.id !== action.payload);
+      saveProducts(state.items);
+    },
+    resetProducts: (state) => {
+      state.items = defaultProducts;
+      saveProducts(state.items);
+    }
+  }
+});
+
+export const { 
+  setFilter, 
+  setFilters, 
+  setSearchQuery, 
+  setSortBy, 
+  addProduct, 
+  updateProduct, 
+  deleteProduct, 
+  resetProducts 
+} = productsSlice.actions;
+
+export default productsSlice.reducer;

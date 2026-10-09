@@ -1,13 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Provider, useSelector } from 'react-redux';
 import { useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { store } from './store';
-import { loadOrders } from './store/slices/ordersSlice';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import Header from './components/layout/Header';
 import CartDrawer from './components/cart/CartDrawer';
-import Toast from './components/ui/Toast';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import ToastContainer from './components/ui/ToastContainer';
 import Home from './pages/Home';
 import Shop from './pages/Shop';
 import Cart from './pages/Cart';
@@ -21,17 +19,21 @@ import Register from './pages/Register';
 import Dashboard from './pages/admin/Dashboard';
 
 function AppContent() {
-  const dispatch = useDispatch();
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
   const theme = useSelector((state) => state.ui.theme);
   
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    // Загружаем заказы при старте
-    dispatch(loadOrders());
-  }, [theme, dispatch]);
+  }, [theme]);
+
+  const getHomeRoute = () => {
+    if (!isAuthenticated) return '/';
+    if (user?.role === 'admin') return '/admin';
+    return '/';
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <Header />
       <CartDrawer />
       <main>
@@ -54,9 +56,10 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          <Route path="*" element={<Navigate to={getHomeRoute()} replace />} />
         </Routes>
       </main>
-      <Toast />
+      <ToastContainer />
     </div>
   );
 }

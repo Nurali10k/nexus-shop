@@ -1,40 +1,37 @@
-import { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
-import { removeToast } from '../../store/slices/uiSlice'
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 
-function ToastMessage({ toast, onDismiss }) {
+export default function Toast({ message, type = 'success', onClose }) {
   useEffect(() => {
-    const timeoutId = window.setTimeout(onDismiss, 3500)
-    return () => window.clearTimeout(timeoutId)
-  }, [onDismiss])
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const icons = {
+    success: <CheckCircle className="text-emerald-400" size={20} />,
+    error: <XCircle className="text-red-400" size={20} />,
+    info: <Info className="text-blue-400" size={20} />
+  };
+
+  const borders = {
+    success: 'border-emerald-500/30',
+    error: 'border-red-500/30',
+    info: 'border-blue-500/30'
+  };
 
   return (
     <motion.div
-      role="status"
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 40 }}
-      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-white shadow-lg ${toast.type === 'error' ? 'bg-red-600' : 'bg-gray-900'}`}
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 50, scale: 0.9 }}
+      className={`fixed bottom-6 right-6 bg-slate-900 border ${borders[type]} rounded-xl p-4 shadow-2xl flex items-center gap-3 z-50 min-w-[300px]`}
     >
-      <span>{toast.message}</span>
-      <button type="button" aria-label="Закрыть уведомление" onClick={onDismiss}><X size={16} /></button>
+      {icons[type]}
+      <span className="text-white text-sm font-medium flex-1">{message}</span>
+      <button onClick={onClose} className="text-slate-400 hover:text-white">
+        <X size={16} />
+      </button>
     </motion.div>
-  )
-}
-
-export default function Toast() {
-  const toasts = useSelector((state) => state.ui.toasts)
-  const dispatch = useDispatch()
-
-  return (
-    <div className="fixed right-4 top-20 z-[60] space-y-2">
-      <AnimatePresence>
-        {toasts.map((toast) => (
-          <ToastMessage key={toast.id} toast={toast} onDismiss={() => dispatch(removeToast(toast.id))} />
-        ))}
-      </AnimatePresence>
-    </div>
-  )
+  );
 }
