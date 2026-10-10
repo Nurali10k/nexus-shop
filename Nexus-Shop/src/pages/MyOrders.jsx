@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 import { ShoppingBag, Clock, CheckCircle, Truck, XCircle, Package } from 'lucide-react';
 import { replaceOrders } from '../store/slices/ordersSlice';
 import { addToast } from '../store/slices/uiSlice';
+import { t } from '../i18n/translations';
 
 export default function MyOrders() {
   const dispatch = useDispatch();
   const orders = useSelector((state) => state.orders.items);
+  const language = useSelector((state) => state.ui.language);
   const [firebaseUser, setFirebaseUser] = useState(null);
 
   useEffect(() => {
@@ -17,42 +19,45 @@ export default function MyOrders() {
 
     Promise.all([
       import('../services/firestore'),
-      import('../firebase'),
-      import('firebase/auth')
-    ]).then(async ([{ subscribeToOrders }, { auth }, { signInAnonymously }]) => {
+      import('../firebase')
+    ]).then(async ([{ subscribeToOrders }, { auth }]) => {
       await auth.authStateReady();
-      let user = auth.currentUser;
+      const user = auth.currentUser;
       if (!user) {
-        const credential = await signInAnonymously(auth);
-        user = credential.user;
-      }
-      if (!user) {
-        throw new Error('Firebase не вернул авторизованного пользователя.');
+        throw new Error(t('signInRequiredForOrder', language));
       }
       if (!active) return;
       setFirebaseUser(user);
       unsubscribe = subscribeToOrders(
         (items) => dispatch(replaceOrders(items)),
         (error) => dispatch(addToast({
-          message: `Не удалось загрузить заказы: ${error.message}`,
+          message: `${t('ordersLoadFailedAdmin', language)} ${error.message}`,
           type: 'error'
         })),
         user
       );
     }).catch((error) => {
-      dispatch(addToast({
-        message: error.code === 'auth/operation-not-allowed'
-          ? 'Гостевой вход отключён в Firebase. Включите Authentication → Sign-in method → Anonymous.'
-          : `Не удалось подключиться к Firestore: ${error.message}`,
-        type: 'error'
-      }));
+      if (active) {
+        dispatch(addToast({
+          message: `${t('ordersLoadFailedAdmin', language)} ${error.message}`,
+          type: 'error'
+        }));
+      }
     });
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [dispatch]);
+  }, [dispatch, language]);
+
+  const statusLabels = {
+    'Новый': t('statusNew', language),
+    'В сборке': t('statusProcessing', language),
+    'В пути': t('statusShipped', language),
+    'Доставлен': t('statusDelivered', language),
+    'Отменён': t('statusCancelled', language)
+  };
 
   const myOrders = firebaseUser?.email === 'admin@nexus.com'
     ? orders
@@ -85,9 +90,9 @@ export default function MyOrders() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <ShoppingBag size={80} className="mx-auto text-gray-300 mb-4" />
-          <h1 className="text-3xl font-bold mb-4">У вас нет заказов</h1>
+          <h1 className="text-3xl font-bold mb-4">{t('noOrders', language)}</h1>
           <Link to="/shop" className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg">
-            Перейти в магазин
+            {t('goToShop', language)}
           </Link>
         </div>
       </div>
@@ -102,7 +107,7 @@ export default function MyOrders() {
           animate={{ opacity: 1, y: 0 }}
           className="text-4xl font-bold mb-8"
         >
-          Мои заказы ({myOrders.length})
+          {t('orders', language)} ({myOrders.length})
         </motion.h1>
 
         <div className="space-y-4">
@@ -116,26 +121,26 @@ export default function MyOrders() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="font-bold text-lg">Заказ #{order.id}</h3>
+                  <h3 className="font-bold text-lg">{t('orderLabel', language)} #{order.id}</h3>
                   <p className="text-sm text-gray-500">
-                    {new Date(order.createdAt).toLocaleString()}
+                    {new Date(order.createdAt).toLocaleString(language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(order.status)}
                   <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${getStatusColor(order.status)}`}>
-                    {order.status}
+                    {statusLabels[order.status] || order.status}
                   </span>
                 </div>
               </div>
 
               {order.statusHistory && order.statusHistory.length > 1 && (
                 <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <p className="text-xs font-bold mb-2">История:</p>
+                  <p className="text-xs font-bold mb-2">{t('orderHistory', language)}</p>
                   <div className="flex flex-wrap gap-2">
                     {order.statusHistory.map((h, i) => (
                       <span key={i} className="text-xs bg-white dark:bg-gray-600 px-2 py-1 rounded">
-                        {h.status} • {new Date(h.date).toLocaleTimeString()}
+                        {statusLabels[h.status] || h.status} • {new Date(h.date).toLocaleTimeString(language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
                       </span>
                     ))}
                   </div>

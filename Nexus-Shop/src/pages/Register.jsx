@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { register, clearError } from '../store/slices/authSlice';
+import { loginWithFirebase, clearError } from '../store/slices/authSlice';
 import { addToast } from '../store/slices/uiSlice';
 
 export default function Register() {
@@ -15,8 +15,33 @@ export default function Register() {
   const [shake, setShake] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/');
-  }, [isAuthenticated, navigate]);
+    let active = true;
+
+    import('../firebase').then(async ({ auth, getRedirectResult }) => {
+      if (!active) return;
+
+      const redirectResult = await getRedirectResult(auth);
+      if (redirectResult?.user) {
+        const user = redirectResult.user;
+        dispatch(loginWithFirebase({
+          uid: user.uid,
+          name: user.displayName,
+          email: user.email,
+          avatar: user.photoURL
+        }));
+        navigate('/');
+        return;
+      }
+
+      if (isAuthenticated) navigate('/');
+    }).catch((error) => {
+      if (active) dispatch(addToast({ message: `Не удалось проверить Firebase: ${error.message}`, type: 'error' }));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [dispatch, isAuthenticated, navigate]);
 
   // Индикатор силы пароля
   const getPasswordStrength = (password) => {
@@ -35,7 +60,34 @@ export default function Register() {
 
   const strength = getPasswordStrength(form.password);
 
-  const handleSubmit = (e) => {
+  const handleGoogleRegister = async () => {
+    try {
+      const { auth, googleProvider, signInWithPopup } = await import('../firebase');
+      const { user } = await signInWithPopup(auth, googleProvider);
+      dispatch(loginWithFirebase({
+        uid: user.uid,
+        name: user.displayName,
+        email: user.email,
+        avatar: user.photoURL
+      }));
+      dispatch(addToast({ message: 'Вы вошли через Google', type: 'success' }));
+    } catch (error) {
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+        try {
+          const { auth, googleProvider, signInWithRedirect } = await import('../firebase');
+          await signInWithRedirect(auth, googleProvider);
+          dispatch(addToast({ message: 'Google-авторизация открылась в новом окне. Вернитесь сюда после входа.', type: 'info' }));
+          return;
+        } catch (redirectError) {
+          dispatch(addToast({ message: `Не удалось открыть Google-авторизацию: ${redirectError.message}`, type: 'error' }));
+          return;
+        }
+      }
+      dispatch(addToast({ message: `Не удалось войти через Google: ${error.message}`, type: 'error' }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.password) {
       setShake(true);
@@ -48,31 +100,37 @@ export default function Register() {
       return;
     }
     dispatch(clearError());
-    dispatch(register(form));
-  };
-
-  const handleGoogleRegister = () => {
-    dispatch(clearError());
-    dispatch(register({ 
-      name: 'Google User', 
-      email: 'google@nexus.com', 
-      password: 'Google2026!', 
-      confirmPassword: 'Google2026!',
-      role: 'user' 
-    }));
-    dispatch(addToast({ message: 'Регистрация через Google (демо)', type: 'success' }));
-  };
-
-  const handleGithubRegister = () => {
-    dispatch(clearError());
-    dispatch(register({ 
-      name: 'GitHub User', 
-      email: 'github@nexus.com', 
-      password: 'Github2026!', 
-      confirmPassword: 'Github2026!',
-      role: 'user' 
-    }));
-    dispatch(addToast({ message: 'Регистрация через GitHub (демо)', type: 'success' }));
+    if (form.email.trim().toLowerCase() === 'admin@nexus.com') {
+      dispatch(addToast({
+        message: 'Этот адрес зарезервирован для администратора. Создайте админ-аккаунт в Firebase Console.',
+        type: 'error'
+      }));
+      return;
+    }
+    try {
+      const { auth } = await import('../firebase');
+      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      const { user } = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      await updateProfile(user, { displayName: form.name.trim() });
+      dispatch(loginWithFirebase({
+        uid: user.uid,
+        name: user.displayName,
+        email: user.email,
+        avatar: user.photoURL
+      }));
+      dispatch(addToast({ message: 'Аккаунт создан', type: 'success' }));
+    } catch (error) {
+      const messages = {
+        'auth/email-already-in-use': 'Аккаунт с таким email уже существует.',
+        'auth/weak-password': 'Пароль слишком простой. Используйте не менее 6 символов.',
+        'auth/operation-not-allowed': 'В Firebase не включена регистрация по email и паролю.',
+        'auth/unauthorized-domain': `Домен ${window.location.hostname} не разрешён в Firebase.`
+      };
+      dispatch(addToast({
+        message: messages[error.code] || `Не удалось создать аккаунт: ${error.message}`,
+        type: 'error'
+      }));
+    }
   };
 
   return (
@@ -223,7 +281,7 @@ export default function Register() {
               <span className="px-2 bg-transparent text-gray-400">ИЛИ ЧЕРЕЗ</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <motion.button
               type="button"
               whileHover={{ y: -2, boxShadow: "0 8px 20px rgba(66, 133, 244, 0.3)" }}
@@ -240,22 +298,7 @@ export default function Register() {
               <span className="text-sm font-medium text-gray-300">Google</span>
             </motion.button>
 
-            <motion.button
-              type="button"
-              whileHover={{ y: -2, boxShadow: "0 8px 20px rgba(255, 255, 255, 0.2)" }}
-              whileTap={{ scale: 0.97 }}
-              onClick={handleGithubRegister}
-              className="flex items-center justify-center gap-2 py-3 border border-white/20 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              <span className="text-sm font-medium text-gray-300">GitHub</span>
-            </motion.button>
           </div>
-          <p className="text-center mt-3 text-xs text-gray-500">
-            * Демо-режим: автоматическая регистрация
-          </p>
         </div>
         
         <p className="text-center mt-6 text-gray-400 text-sm">

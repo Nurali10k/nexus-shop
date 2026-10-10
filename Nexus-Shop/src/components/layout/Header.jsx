@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Sun, Globe, User, LogOut, ShoppingCart, Heart, Menu, X } from 'lucide-react';
+import { Moon, Sun, User, LogOut, ShoppingCart, Heart, Menu, X } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
-import { setTheme, setLanguage } from '../../store/slices/uiSlice';
+import { addToast, setTheme, setLanguage } from '../../store/slices/uiSlice';
 
 export default function Header() {
   const dispatch = useDispatch();
@@ -17,14 +17,22 @@ export default function Header() {
   const [mobileMenu, setMobileMenu] = useState(false);
 
   const translations = {
-    ru: { home: 'Главная', shop: 'Магазин', orders: 'Мои заказы', support: 'Поддержка', login: 'Войти', logout: 'Выйти', profile: 'Профиль' },
-    en: { home: 'Home', shop: 'Shop', orders: 'My Orders', support: 'Support', login: 'Login', logout: 'Logout', profile: 'Profile' },
-    kg: { home: 'Башкы', shop: 'Дүкөн', orders: 'Менин заказдар', support: 'Колдоо', login: 'Кирүү', logout: 'Чыгуу', profile: 'Профиль' }
+    ru: { home: 'Главная', shop: 'Магазин', orders: 'Мои заказы', support: 'Поддержка', login: 'Войти', logout: 'Выйти', profile: 'Профиль', admin: 'Админ', logoutError: 'Не удалось выйти из Firebase:' },
+    en: { home: 'Home', shop: 'Shop', orders: 'My Orders', support: 'Support', login: 'Login', logout: 'Logout', profile: 'Profile', admin: 'Admin', logoutError: 'Could not sign out of Firebase:' },
+    kg: { home: 'Башкы', shop: 'Дүкөн', orders: 'Менин заказдар', support: 'Колдоо', login: 'Кирүү', logout: 'Чыгуу', profile: 'Профиль', admin: 'Админ', logoutError: 'Firebase аккаунтунан чыгуу мүмкүн болгон жок:' }
   };
   
   const t = translations[language] || translations.ru;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const { auth } = await import('../../firebase');
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth);
+    } catch (error) {
+      dispatch(addToast({ message: `${t.logoutError} ${error.message}`, type: 'error' }));
+      return;
+    }
     dispatch(logout());
     navigate('/');
     setShowProfile(false);
@@ -125,7 +133,7 @@ export default function Header() {
                       </Link>
                       {user.role === 'admin' && (
                         <Link to="/admin" onClick={() => setShowProfile(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-purple-400 hover:bg-slate-700 rounded-lg">
-                          <User size={16} /> Админ
+                          <User size={16} /> {t.admin}
                         </Link>
                       )}
                       <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg">

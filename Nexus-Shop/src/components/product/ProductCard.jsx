@@ -35,7 +35,7 @@ export default function ProductCard({ product }) {
         </Link>
         <button
           type="button"
-          aria-label={isInWishlist ? 'Убрать из избранного' : 'Добавить в избранное'}
+          aria-label={t(isInWishlist ? 'removeFromWishlist' : 'addToWishlist', language)}
           aria-pressed={isInWishlist}
           onClick={() => dispatch(toggleWishlist(product))}
           className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-gray-700 shadow hover:text-red-500 dark:bg-gray-900/90 dark:text-white"
@@ -46,7 +46,7 @@ export default function ProductCard({ product }) {
         </button>
       </div>
       <div className="p-4">
-        <p className="mb-1 text-xs uppercase tracking-wider text-primary-600">{product.category}</p>
+        <p className="mb-1 text-xs uppercase tracking-wider text-primary-600">{product.category ? t(product.category, language) : t('noCategory', language)}</p>
         <Link to={`/product/${product.id}`} className="font-semibold hover:text-primary-600">{product.name}</Link>
         <div className="my-3"><StarRating rating={product.rating} size={15} /></div>
         <div className="flex items-center justify-between gap-3">

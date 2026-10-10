@@ -1,3 +1,5 @@
+import { t } from '../i18n/translations';
+
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const SYSTEM_PROMPT = `Ты — AI-ассистент интернет-магазина электроники NEXUS из Кыргызстана.
@@ -36,7 +38,7 @@ const MODELS = [
   'gemini-2.5-flash-lite',  // Запасная
 ];
 
-async function tryModel(modelName, userMessage) {
+async function tryModel(modelName, userMessage, language) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
   
   const response = await fetch(url, {
@@ -44,7 +46,7 @@ async function tryModel(modelName, userMessage) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{
-        parts: [{ text: SYSTEM_PROMPT + '\n\nВопрос пользователя: ' + userMessage }]
+        parts: [{ text: `${SYSTEM_PROMPT}\n\nRespond in ${language === 'en' ? 'English' : language === 'kg' ? 'Kyrgyz' : 'Russian'}.\n\nВопрос пользователя: ${userMessage}` }]
       }],
       generationConfig: {
         temperature: 0.7,
@@ -73,15 +75,15 @@ async function tryModel(modelName, userMessage) {
   return text;
 }
 
-export async function askGemini(userMessage) {
+export async function askGemini(userMessage, language = 'ru') {
   if (!GEMINI_API_KEY) {
-    return '⚠️ API ключ не настроен. Добавь VITE_GEMINI_API_KEY в файл .env';
+    return `⚠️ ${t('supportApiKeyMissing', language)}`;
   }
 
   for (const model of MODELS) {
     try {
       console.log(`🤖 Пробуем модель: ${model}`);
-      const answer = await tryModel(model, userMessage);
+      const answer = await tryModel(model, userMessage, language);
       if (answer) {
         console.log(`✅ Ответ получен от ${model} (${answer.length} символов)`);
         return answer;
@@ -92,5 +94,5 @@ export async function askGemini(userMessage) {
     }
   }
 
-  return '🤖 Извините, AI временно недоступен. Наш оператор скоро ответит. Попробуйте задать вопрос о доставке, оплате или гарантии. Или напишите на admin@nexus.com';
+  return `🤖 ${t('supportAiUnavailable', language)}`;
 }

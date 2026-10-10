@@ -4,10 +4,12 @@ import { motion } from 'framer-motion';
 import { Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { removeFromCart, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import { addToast } from '../store/slices/uiSlice';
+import { t } from '../i18n/translations';
 
 export default function Cart() {
   const dispatch = useDispatch();
   const items = useSelector((state) => state.cart.items);
+  const language = useSelector((state) => state.ui.language);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   if (items.length === 0) {
@@ -15,10 +17,10 @@ export default function Cart() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
           <ShoppingBag size={80} className="mx-auto text-gray-300 mb-4" />
-          <h1 className="text-3xl font-bold mb-4">Корзина пуста</h1>
-          <p className="text-gray-500 mb-6">Добавьте товары из каталога</p>
+          <h1 className="text-3xl font-bold mb-4">{t('emptyCart', language)}</h1>
+          <p className="text-gray-500 mb-6">{t('addProductsFromCatalog', language)}</p>
           <Link to="/shop" className="btn-primary inline-block">
-            Перейти в магазин
+            {t('goToShop', language)}
           </Link>
         </div>
       </div>
@@ -28,7 +30,7 @@ export default function Cart() {
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        <h1 className="text-4xl font-bold mb-8">Корзина ({items.length})</h1>
+        <h1 className="text-4xl font-bold mb-8">{t('cart', language)} ({items.length})</h1>
         
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
@@ -43,7 +45,7 @@ export default function Cart() {
                 <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-lg" />
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg">{item.name}</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">{item.category}</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">{item.category ? t(item.category, language) : t('noCategory', language)}</p>
                   <p className="text-primary-500 font-bold mt-1">{item.price.toLocaleString()} ₽</p>
                   
                   <div className="flex items-center gap-2 mt-3">
@@ -66,7 +68,7 @@ export default function Cart() {
                   <button
                     onClick={() => {
                       dispatch(removeFromCart(item.id));
-                      dispatch(addToast({ message: 'Удалено из корзины', type: 'info', id: Date.now() }));
+                      dispatch(addToast({ message: t('removeFromCart', language), type: 'info', id: Date.now() }));
                     }}
                     className="text-red-500 hover:text-red-600 p-2"
                   >
@@ -81,29 +83,29 @@ export default function Cart() {
           </div>
 
           <div className="card p-6 h-fit sticky top-24">
-            <h2 className="text-xl font-bold mb-4">Итого</h2>
+            <h2 className="text-xl font-bold mb-4">{t('total', language)}</h2>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
-                <span>Товаров:</span>
-                <span>{items.reduce((s, i) => s + i.quantity, 0)} шт.</span>
+                <span>{t('items', language)}</span>
+                <span>{items.reduce((s, i) => s + i.quantity, 0)} {t('itemUnits', language)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2 dark:border-gray-700">
-                <span>К оплате:</span>
+                <span>{t('amountDue', language)}</span>
                 <span className="neon-text">{total.toLocaleString()} ₽</span>
               </div>
             </div>
             <Link to="/checkout" className="btn-primary block text-center">
-              Оформить заказ →
+              {t('checkout', language)}
             </Link>
             <button
               onClick={() => {
-                if (confirm('Очистить корзину?')) {
+                if (confirm(t('confirmClearCart', language))) {
                   dispatch(clearCart());
                 }
               }}
               className="w-full mt-2 text-red-500 hover:text-red-600 text-sm py-2"
             >
-              Очистить корзину
+              {t('clearCart', language)}
             </button>
           </div>
         </div>

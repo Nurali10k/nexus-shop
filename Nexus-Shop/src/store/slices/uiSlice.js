@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { translations } from '../../i18n/translations';
 
 const initialState = {
   theme: localStorage.getItem('nexus_theme') || 'dark',
@@ -28,4 +29,11 @@ const uiSlice = createSlice({
 });
 
 export const { setTheme, setLanguage, addToast, removeToast } = uiSlice.actions;
+
+// Селектор для получения переводов
+export const selectTranslations = (state) => {
+  const lang = state.ui.language;
+  return translations[lang] || translations.ru;
+};
+
 export default uiSlice.reducer;

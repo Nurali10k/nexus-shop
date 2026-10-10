@@ -1,14 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
-import { Camera, User, Mail, Save, LogOut, Upload } from 'lucide-react';
+import { Camera, User, Mail, Save, LogOut } from 'lucide-react';
 import { updateUser, logout } from '../store/slices/authSlice';
+import { addToast } from '../store/slices/uiSlice';
 import { useNavigate } from 'react-router-dom';
+import { t } from '../i18n/translations';
 
 export default function Profile() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const language = useSelector((state) => state.ui.language);
   const fileInputRef = useRef(null);
   
   const [form, setForm] = useState({
@@ -19,17 +22,6 @@ export default function Profile() {
   const [preview, setPreview] = useState(user?.avatar || null);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        email: user.email || '',
-        bio: user.bio || ''
-      });
-      setPreview(user.avatar || null);
-    }
-  }, [user]);
-
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -38,7 +30,7 @@ export default function Profile() {
         const avatar = reader.result;
         setPreview(avatar);
         dispatch(updateUser({ avatar }));
-        alert('Фото профиля обновлено!');
+        alert(t('avatarUpdated', language));
       };
       reader.readAsDataURL(file);
     }
@@ -48,10 +40,18 @@ export default function Profile() {
     e.preventDefault();
     dispatch(updateUser(form));
     setIsEditing(false);
-    alert('Профиль сохранён!');
+    alert(t('profileSaved', language));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const { auth } = await import('../firebase');
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth);
+    } catch (error) {
+      dispatch(addToast({ message: `${t('firebaseLogoutFailed', language)} ${error.message}`, type: 'error' }));
+      return;
+    }
     dispatch(logout());
     navigate('/');
   };
@@ -59,7 +59,7 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <p className="text-white">Загрузка...</p>
+        <p className="text-white">{t('loading', language)}</p>
       </div>
     );
   }
@@ -121,7 +121,7 @@ export default function Profile() {
           <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
             user?.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
           }`}>
-            {user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
+            {user?.role === 'admin' ? t('admin', language) : t('userRole', language)}
           </span>
         </motion.div>
 
@@ -133,9 +133,9 @@ export default function Profile() {
           className="grid grid-cols-3 gap-4 mb-8"
         >
           {[
-            { label: 'Рейтинг', value: `⭐ ${user?.rating || 5}`, color: 'from-yellow-500 to-orange-500' },
-            { label: 'Роль', value: user?.role === 'admin' ? 'Админ' : 'Юзер', color: 'from-purple-500 to-pink-500' },
-            { label: 'Статус', value: 'Активен', color: 'from-green-500 to-emerald-500' }
+            { label: t('rating', language), value: `⭐ ${user?.rating || 5}`, color: 'from-yellow-500 to-orange-500' },
+            { label: t('role', language), value: user?.role === 'admin' ? t('adminShort', language) : t('userShort', language), color: 'from-purple-500 to-pink-500' },
+            { label: t('status', language), value: t('active', language), color: 'from-green-500 to-emerald-500' }
           ].map((stat, idx) => (
             <motion.div
               key={idx}
@@ -161,20 +161,20 @@ export default function Profile() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <User size={20} className="text-purple-500" />
-              Редактировать профиль
+              {t('editProfile', language)}
             </h2>
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
                 className="px-4 py-2 bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg text-sm font-medium hover:bg-purple-500/30 transition-colors"
               >
-                Редактировать
+                {t('edit', language)}
               </button>
             )}
           </div>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">Имя</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">{t('name', language)}</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -187,7 +187,7 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">Email</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">{t('email', language)}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -200,13 +200,13 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">О себе</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1.5">{t('about', language)}</label>
               <textarea
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
                 disabled={!isEditing}
                 rows="3"
-                placeholder="Расскажите о себе..."
+                placeholder={t('aboutPlaceholder', language)}
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
@@ -219,7 +219,7 @@ export default function Profile() {
                   className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold rounded-xl flex items-center justify-center gap-2"
                 >
                   <Save size={18} />
-                  Сохранить
+                  {t('save', language)}
                 </motion.button>
                 <motion.button
                   type="button"
@@ -228,7 +228,7 @@ export default function Profile() {
                   onClick={() => setIsEditing(false)}
                   className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
                 >
-                  Отмена
+                  {t('cancel', language)}
                 </motion.button>
               </div>
             )}
@@ -247,7 +247,7 @@ export default function Profile() {
             className="px-6 py-3 bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition-colors flex items-center gap-2 mx-auto"
           >
             <LogOut size={18} />
-            Выйти из аккаунта
+            {t('logoutButton', language)}
           </button>
         </motion.div>
       </div>

@@ -3,21 +3,22 @@ import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { MessageCircle, Send, User, Bot, Loader2, Sparkles } from 'lucide-react';
 import { addMessage } from '../store/slices/supportSlice';
-import { addToast } from '../store/slices/uiSlice';
 import { askGemini } from '../services/geminiAI';
+import { t } from '../i18n/translations';
 
 const faqData = [
-  { q: 'Как оформить заказ?', a: 'Добавьте товары в корзину и нажмите "Оформить заказ"' },
-  { q: 'Сколько длится доставка?', a: '1-3 дня по Бишкеку, 3-7 дней по регионам' },
-  { q: 'Можно ли вернуть товар?', a: 'Да, в течение 14 дней с момента покупки' },
-  { q: 'Какие способы оплаты?', a: 'Банковская карта или наличные при получении' },
-  { q: 'Есть ли гарантия?', a: 'Да, официальная гарантия на все товары' }
+  { questionKey: 'howToOrder', answerKey: 'faqHowToOrderAnswer' },
+  { questionKey: 'deliveryTime', answerKey: 'faqDeliveryAnswer' },
+  { questionKey: 'returnProduct', answerKey: 'faqReturnAnswer' },
+  { questionKey: 'paymentMethods', answerKey: 'faqPaymentAnswer' },
+  { questionKey: 'warranty', answerKey: 'faqWarrantyAnswer' }
 ];
 
 export default function Support() {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.support.messages);
   const { user } = useSelector((state) => state.auth);
+  const language = useSelector((state) => state.ui.language);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef(null);
@@ -37,7 +38,7 @@ export default function Support() {
     // Добавляем сообщение пользователя
     dispatch(addMessage({
       text: userMsg,
-      sender: user?.name || 'Гость',
+      sender: user?.name || t('guest', language),
       userId: user?.id || null,
       type: 'user'
     }));
@@ -46,7 +47,7 @@ export default function Support() {
 
     try {
       // Запрашиваем ответ у Gemini
-      const aiResponse = await askGemini(userMsg);
+      const aiResponse = await askGemini(userMsg, language);
 
       // Добавляем ответ бота
       dispatch(addMessage({
@@ -54,9 +55,9 @@ export default function Support() {
         sender: 'NEXUS AI',
         type: 'bot'
       }));
-    } catch (error) {
+    } catch {
       dispatch(addMessage({
-        text: 'Извините, произошла ошибка. Попробуйте позже.',
+        text: t('supportError', language),
         sender: 'NEXUS AI',
         type: 'bot'
       }));
@@ -79,9 +80,9 @@ export default function Support() {
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-2 neon-text flex items-center justify-center gap-3">
             <Sparkles className="text-purple-500" size={40} />
-            Служба поддержки NEXUS
+            {t('supportTitle', language)}
           </h1>
-          <p className="text-gray-400">AI-ассистент на базе Gemini 2.0 Flash</p>
+          <p className="text-gray-400">{t('supportSubtitle', language)}</p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -89,23 +90,23 @@ export default function Support() {
           <div className="md:col-span-1">
             <div className="card p-4 sticky top-24">
               <h3 className="font-bold mb-4 flex items-center gap-2">
-                <MessageCircle size={18} /> Частые вопросы
+                <MessageCircle size={18} /> {t('faq', language)}
               </h3>
               <div className="space-y-2">
                 {faqData.map((item, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleFaqClick(item.q)}
+                    onClick={() => handleFaqClick(t(item.questionKey, language))}
                     className="w-full text-left p-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-purple-500/20 transition-all text-sm"
                   >
-                    <p className="font-medium">{item.q}</p>
+                    <p className="font-medium">{t(item.questionKey, language)}</p>
                   </button>
                 ))}
               </div>
 
               <div className="mt-6 p-3 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-lg border border-purple-500/30">
                 <p className="text-xs text-gray-400">
-                  💡 <strong>Совет:</strong> Нажмите на вопрос, чтобы быстро отправить его боту
+                  💡 {t('faqTip', language)}
                 </p>
               </div>
             </div>
@@ -120,10 +121,10 @@ export default function Support() {
                   <Bot className="text-white" size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold">NEXUS AI Assistant</h3>
+                  <h3 className="font-bold">{t('aiAssistant', language)}</h3>
                   <p className="text-xs text-green-500 flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    Онлайн • Gemini 2.0 Flash
+                    {t('online', language)} • Gemini 2.0 Flash
                   </p>
                 </div>
               </div>
@@ -135,18 +136,18 @@ export default function Support() {
                     <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
                       <Sparkles size={40} className="text-white" />
                     </div>
-                    <h3 className="font-bold text-lg mb-2">Привет! 👋</h3>
+                    <h3 className="font-bold text-lg mb-2">{t('greeting', language)}</h3>
                     <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                      Я AI-ассистент NEXUS. Спросите меня о товарах, доставке, оплате или гарантии!
+                      {t('greetingBody', language)}
                     </p>
                     <div className="flex flex-wrap gap-2 justify-center mt-4">
-                      {['Привет!', 'Как оформить заказ?', 'Сколько стоит доставка?'].map((q, i) => (
+                      {['greetingSuggestion', 'orderSuggestion', 'deliverySuggestion'].map((key) => (
                         <button
-                          key={i}
-                          onClick={() => handleFaqClick(q)}
+                          key={key}
+                          onClick={() => handleFaqClick(t(key, language))}
                           className="text-xs px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 hover:bg-purple-500/20"
                         >
-                          {q}
+                          {t(key, language)}
                         </button>
                       ))}
                     </div>
@@ -210,7 +211,7 @@ export default function Support() {
               <form onSubmit={handleSend} className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <input
                   type="text"
-                  placeholder="Напишите ваш вопрос..."
+                  placeholder={t('writeQuestion', language)}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="input-field flex-1"

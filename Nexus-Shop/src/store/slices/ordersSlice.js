@@ -14,8 +14,7 @@ export const createOrder = createAsyncThunk('orders/createOrder', async (order) 
 
 export const updateOrder = createAsyncThunk('orders/updateOrder', async ({ id, ...order }) => {
   const { updateOrderInFirestore } = await import('../../services/firestore');
-  await updateOrderInFirestore(id, order);
-  return { ...order, id: String(id) };
+  return updateOrderInFirestore(id, order);
 });
 
 export const removeOrder = createAsyncThunk('orders/removeOrder', async (id) => {
@@ -62,7 +61,9 @@ const ordersSlice = createSlice({
       })
       .addCase(createOrder.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.push(action.payload);
+        const index = state.items.findIndex(order => order.id === action.payload.id);
+        if (index === -1) state.items.push(action.payload);
+        else state.items[index] = action.payload;
       })
       .addCase(createOrder.rejected, (state, action) => {
         state.loading = false;

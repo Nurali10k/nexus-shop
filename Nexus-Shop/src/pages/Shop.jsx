@@ -7,20 +7,21 @@ import { addToCart } from '../store/slices/cartSlice';
 import { addToWishlist, removeFromWishlist } from '../store/slices/wishlistSlice';
 import { addToast } from '../store/slices/uiSlice';
 import { replaceProducts } from '../store/slices/productsSlice';
+import { t } from '../i18n/translations';
 
 const CATEGORIES = [
-  { id: 'all', name: 'Все товары', icon: '🛍️' },
-  { id: 'headphones', name: 'Наушники', icon: '🎧' },
-  { id: 'keyboards', name: 'Клавиатуры', icon: '⌨️' },
-  { id: 'mice', name: 'Мыши', icon: '🖱️' },
-  { id: 'watches', name: 'Часы', icon: '⌚' }
+  { id: 'all', translationKey: 'allProducts', icon: '🛍️' },
+  { id: 'headphones', translationKey: 'headphones', icon: '🎧' },
+  { id: 'keyboards', translationKey: 'keyboards', icon: '⌨️' },
+  { id: 'mice', translationKey: 'mice', icon: '🖱️' },
+  { id: 'watches', translationKey: 'watches', icon: '⌚' }
 ];
 
 const SORT_OPTIONS = [
-  { id: 'popular', name: 'По популярности' },
-  { id: 'price-asc', name: 'Цена: по возрастанию' },
-  { id: 'price-desc', name: 'Цена: по убыванию' },
-  { id: 'rating', name: 'По рейтингу' }
+  { id: 'popular', translationKey: 'sortByPopularity' },
+  { id: 'price-asc', translationKey: 'sortByPriceAsc' },
+  { id: 'price-desc', translationKey: 'sortByPriceDesc' },
+  { id: 'rating', translationKey: 'sortByRating' }
 ];
 
 export default function Shop() {
@@ -31,6 +32,7 @@ export default function Shop() {
   const sortBy = useSelector((state) => state.products.sortBy);
   const cartItems = useSelector((state) => state.cart.items);
   const wishlistItems = useSelector((state) => state.wishlist.items);
+  const language = useSelector((state) => state.ui.language);
   
   const [showFilters, setShowFilters] = useState(false);
 
@@ -43,13 +45,13 @@ export default function Shop() {
       unsubscribe = subscribeToProducts(
         (products) => dispatch(replaceProducts(products)),
         (error) => dispatch(addToast({
-          message: `Не удалось загрузить товары: ${error.message}`,
+          message: `${t('productsLoadFailed', language)} ${error.message}`,
           type: 'error'
         }))
       );
     }).catch((error) => {
       dispatch(addToast({
-        message: `Не удалось подключить товары: ${error.message}`,
+        message: `${t('productsConnectFailed', language)} ${error.message}`,
         type: 'error'
       }));
     });
@@ -58,7 +60,7 @@ export default function Shop() {
       active = false;
       unsubscribe();
     };
-  }, [dispatch]);
+  }, [dispatch, language]);
 
   // Фильтрация и сортировка с защитой от undefined
   const filteredProducts = products
@@ -84,10 +86,10 @@ export default function Shop() {
     if (!product) return;
     const existing = cartItems.find(item => item.id === product.id);
     if (existing) {
-      dispatch(addToast({ message: 'Товар уже в корзине', type: 'info' }));
+      dispatch(addToast({ message: t('productAlreadyInCart', language), type: 'info' }));
     } else {
       dispatch(addToCart({ ...product, quantity: 1 }));
-      dispatch(addToast({ message: `${product.name} добавлен в корзину`, type: 'success' }));
+      dispatch(addToast({ message: `${product.name} ${t('addedToCart', language)}`, type: 'success' }));
     }
   };
 
@@ -96,10 +98,10 @@ export default function Shop() {
     const isInWishlist = wishlistItems.some(item => item.id === product.id);
     if (isInWishlist) {
       dispatch(removeFromWishlist(product.id));
-      dispatch(addToast({ message: 'Удалено из избранного', type: 'info' }));
+      dispatch(addToast({ message: t('removedFromWishlist', language), type: 'info' }));
     } else {
       dispatch(addToWishlist(product));
-      dispatch(addToast({ message: 'Добавлено в избранное', type: 'success' }));
+      dispatch(addToast({ message: t('addedToWishlist', language), type: 'success' }));
     }
   };
 
@@ -115,8 +117,8 @@ export default function Shop() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Магазин</h1>
-          <p className="text-gray-500 dark:text-gray-400">Найди идеальное устройство для себя</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{t('shopTitle', language)}</h1>
+          <p className="text-gray-500 dark:text-gray-400">{t('shopSubtitle', language)}</p>
         </motion.div>
 
         {/* Поиск и фильтры */}
@@ -125,7 +127,7 @@ export default function Shop() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Поиск товаров..."
+              placeholder={t('searchPlaceholder', language)}
               value={searchQuery}
               onChange={(e) => dispatch(setSearchQuery(e.target.value))}
               className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
@@ -145,7 +147,7 @@ export default function Shop() {
             className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
           >
             {SORT_OPTIONS.map(option => (
-              <option key={option.id} value={option.id}>{option.name}</option>
+              <option key={option.id} value={option.id}>{t(option.translationKey, language)}</option>
             ))}
           </select>
           <button
@@ -153,7 +155,7 @@ export default function Shop() {
             className="md:hidden px-4 py-3 bg-purple-600 text-white rounded-xl flex items-center justify-center gap-2"
           >
             <Filter size={20} />
-            Фильтры
+            {t('filters', language)}
           </button>
         </div>
 
@@ -173,7 +175,7 @@ export default function Shop() {
                 }`}
               >
                 <span className="mr-2">{category.icon}</span>
-                {category.name}
+                {t(category.translationKey, language)}
               </motion.button>
             ))}
           </div>
@@ -181,7 +183,7 @@ export default function Shop() {
 
         {/* Результаты */}
         <div className="mb-4 text-gray-500 dark:text-gray-400">
-          Найдено товаров: <span className="font-bold text-purple-600">{filteredProducts.length}</span>
+          {t('productsFound', language)} <span className="font-bold text-purple-600">{filteredProducts.length}</span>
         </div>
 
         {/* Сетка товаров */}
@@ -192,8 +194,8 @@ export default function Shop() {
             className="text-center py-16"
           >
             <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Товары не найдены</h3>
-            <p className="text-gray-500">Попробуйте изменить параметры поиска</p>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('noProducts', language)}</h3>
+            <p className="text-gray-500">{t('adjustSearch', language)}</p>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -215,15 +217,15 @@ export default function Shop() {
                     {product.image ? (
                       <img
                         src={product.image}
-                        alt={product.name || 'Товар'}
+                        alt={product.name || t('noName', language)}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
+                          e.target.src = `https://via.placeholder.com/400x300?text=${encodeURIComponent(t('noImage', language))}`;
                         }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        Нет фото
+                        {t('noImage', language)}
                       </div>
                     )}
                     <button
@@ -244,10 +246,10 @@ export default function Shop() {
                   {/* Контент */}
                   <div className="p-4">
                     <div className="text-xs text-purple-600 dark:text-purple-400 font-medium mb-1 uppercase">
-                      {product.category || 'Без категории'}
+                      {product.category ? t(product.category, language) : t('noCategory', language)}
                     </div>
                     <h3 className="font-bold text-gray-900 dark:text-white mb-2 line-clamp-2">
-                      {product.name || 'Без названия'}
+                      {product.name || t('noName', language)}
                     </h3>
                     
                     {/* Рейтинг */}
