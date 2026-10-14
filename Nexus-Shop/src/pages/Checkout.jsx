@@ -61,6 +61,23 @@ export default function Checkout() {
         authenticated: true
       });
       const createdOrder = await dispatch(createOrder(order)).unwrap();
+
+      try {
+        const notificationResponse = await fetch('/api/telegram/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createdOrder),
+        });
+        if (!notificationResponse.ok) {
+          throw new Error('Telegram notification failed');
+        }
+      } catch (notificationError) {
+        console.error('[Checkout] Telegram notification failed', notificationError);
+        dispatch(addToast({
+          message: 'Order saved, but the Telegram notification could not be sent.',
+          type: 'info'
+        }));
+      }
       console.info('[Checkout] Заказ сохранён', { id: createdOrder.id });
       dispatch(clearCart());
       dispatch(addToast({ message: t('orderPlaced', language), type: 'success' }));

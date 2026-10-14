@@ -1,8 +1,9 @@
-const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (character) => ({
+﻿const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
   '&': '&amp;',
   '<': '&lt;',
   '>': '&gt;',
   '"': '&quot;',
+  "'": '&#39;',
 })[character])
 
 export default async function handler(request, response) {
@@ -11,9 +12,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'Method not allowed.' })
   }
 
-  const environment = globalThis.process?.env ?? {}
-  const token = environment.TELEGRAM_BOT_TOKEN
-  const chatId = environment.TELEGRAM_CHAT_ID
+  const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = globalThis.process?.env ?? {}
   if (!token || !chatId) {
     return response.status(503).json({ error: 'Telegram notifications are not configured on the server.' })
   }
@@ -21,7 +20,7 @@ export default async function handler(request, response) {
   const order = request.body
   if (
     !order ||
-    !Number.isSafeInteger(order.id) ||
+    !(typeof order.id === 'string' || Number.isSafeInteger(order.id)) ||
     typeof order.name !== 'string' ||
     typeof order.phone !== 'string' ||
     typeof order.address !== 'string' ||
@@ -53,14 +52,13 @@ export default async function handler(request, response) {
     return response.status(400).json({ error: 'Order total does not match its items.' })
   }
 
-  const itemsText = lines.join('\n')
-  const message = `🚀 <b>НОВЫЙ ЗАКАЗ NEXUS #${order.id}</b>\n\n` +
+  const message = `🚀 <b>НОВЫЙ ЗАКАЗ NEXUS #${escapeHtml(order.id)}</b>\n\n` +
     `👤 <b>Клиент:</b> ${escapeHtml(order.name.slice(0, 100))}\n` +
     `📞 <b>Телефон:</b> ${escapeHtml(order.phone.slice(0, 40))}\n` +
     `📍 <b>Адрес:</b> ${escapeHtml(order.address.slice(0, 300))}\n\n` +
-    `🛒 <b>Товары:</b>\n${itemsText}\n\n` +
+    `🛒 <b>Товары:</b>\n${lines.join('\n')}\n\n` +
     `💰 <b>ИТОГО:</b> ${calculatedTotal.toLocaleString('ru-RU')} ₽\n` +
-    `💳 <b>Оплата:</b> ${order.payment === 'card' ? 'Карта' : 'Наличные'}\n` +
+    `💳 <b>Оплата:</b> ${order.payment === 'card' ? 'Картой' : 'Наличными'}\n` +
     '📊 <b>Статус:</b> Новый'
 
   try {
@@ -69,11 +67,14 @@ export default async function handler(request, response) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
     })
-    if (!telegramResponse.ok) {
+    const telegramResult = await telegramResponse.json().catch(() => null)
+    if (!telegramResponse.ok || !telegramResult?.ok) {
+      console.error('[Telegram] sendMessage failed', telegramResult?.description || telegramResponse.status)
       return response.status(502).json({ error: 'Telegram did not accept the order notification.' })
     }
     return response.status(200).json({ ok: true })
-  } catch {
+  } catch (error) {
+    console.error('[Telegram] Unable to reach Telegram', error)
     return response.status(502).json({ error: 'Unable to reach Telegram.' })
   }
 }
