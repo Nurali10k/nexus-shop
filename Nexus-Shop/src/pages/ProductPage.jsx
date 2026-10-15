@@ -1,25 +1,61 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useParams } from 'react-router-dom'
-import { Heart, ShoppingCart } from 'lucide-react'
+import { Heart, ShoppingCart, Star } from 'lucide-react'
 import StarRating from '../components/ui/StarRating'
 import Button from '../components/ui/Button'
 import { addToCart } from '../store/slices/cartSlice'
 import { toggleWishlist } from '../store/slices/wishlistSlice'
 import { addToast } from '../store/slices/uiSlice'
 import { t } from '../i18n/translations'
+import { saveProductReview, subscribeToProductReviews } from '../services/firestore'
 
 export default function ProductPage() {
   const { id } = useParams()
   const dispatch = useDispatch()
   const product = useSelector((state) => state.products.items.find((item) => String(item.id) === id))
+  const productId = product?.id
   const language = useSelector((state) => state.ui.language)
+  const user = useSelector((state) => state.auth.user)
   const isInWishlist = useSelector((state) => state.wishlist.items.some((item) => item.id === product?.id))
+  const [reviews, setReviews] = useState([])
+  const [rating, setRating] = useState(5)
+  const [reviewText, setReviewText] = useState('')
+  const [savingReview, setSavingReview] = useState(false)
+
+  useEffect(() => {
+    if (!productId) return undefined
+    return subscribeToProductReviews(productId, setReviews, (error) => console.error('Не удалось загрузить отзывы:', error))
+  }, [productId])
+
+  const averageRating = useMemo(() => reviews.length
+    ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+    : Number(product?.rating || 0), [reviews, product?.rating])
 
   if (!product) return <section className="page-shell text-center"><h1 className="text-3xl font-bold">Товар не найден</h1><Link to="/shop" className="mt-4 inline-block text-primary-600">Вернуться в каталог</Link></section>
 
   const addProduct = () => {
     dispatch(addToCart(product))
-    dispatch(addToast({ id: Date.now(), message: `${product.name} добавлен в корзину`, type: 'success' }))
+    dispatch(addToast({ message: `${product.name} добавлен в корзину`, type: 'success' }))
+  }
+
+  const submitReview = async (event) => {
+    event.preventDefault()
+    if (!user) {
+      dispatch(addToast({ message: 'Войдите в аккаунт, чтобы оставить отзыв.', type: 'info' }))
+      return
+    }
+    if (!reviewText.trim()) return
+    setSavingReview(true)
+    try {
+      await saveProductReview({ productId: product.id, rating, text: reviewText })
+      setReviewText('')
+      dispatch(addToast({ message: 'Отзыв сохранён', type: 'success' }))
+    } catch (error) {
+      dispatch(addToast({ message: error.message || 'Не удалось сохранить отзыв', type: 'error' }))
+    } finally {
+      setSavingReview(false)
+    }
   }
 
   return (
@@ -30,9 +66,9 @@ export default function ProductPage() {
         <div className="py-4">
           <p className="mb-3 uppercase tracking-widest text-primary-600">{product.category}</p>
           <h1 className="mb-4 text-4xl font-bold">{product.name}</h1>
-          <StarRating rating={product.rating} />
+          <StarRating rating={averageRating} />
           <p className="my-7 leading-7 text-gray-600 dark:text-gray-300">{product.description}</p>
-          <p className="mb-6 text-3xl font-bold">{product.price.toLocaleString('ru-RU')} ₽</p>
+          <p className="mb-6 text-3xl font-bold">{product.price.toLocaleString('ru-RU')} сом</p>
           <p className="mb-6 text-sm text-gray-500">{t('product.inStock', language)}: {product.stock}</p>
           <div className="flex flex-wrap gap-3">
             <Button onClick={addProduct} disabled={product.stock < 1}><ShoppingCart className="mr-2 inline" size={18} />{t('product.addToCart', language)}</Button>
@@ -40,7 +76,29 @@ export default function ProductPage() {
           </div>
         </div>
       </div>
-      <section className="mt-12"><h2 className="mb-4 text-2xl font-bold">{t('product.reviews', language)}</h2><div className="card p-5"><StarRating rating={product.rating} /><p className="mt-2 text-gray-500">Средняя оценка покупателей.</p></div></section>
+
+      <section className="mt-12">
+        <h2 className="mb-4 text-2xl font-bold">{t('product.reviews', language)} ({reviews.length})</h2>
+        <div className="card p-5">
+          <div className="mb-5 flex items-center gap-2"><StarRating rating={averageRating} /><span className="text-sm text-gray-500">Средняя оценка по отзывам</span></div>
+          <form onSubmit={submitReview} className="mb-6 space-y-3">
+            <label className="block text-sm font-medium">Ваша оценка
+              <select value={rating} onChange={(event) => setRating(Number(event.target.value))} className="ml-3 rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800">
+                {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} из 5</option>)}
+              </select>
+            </label>
+            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} maxLength={1000} placeholder="Поделитесь впечатлениями о товаре" className="min-h-24 w-full rounded-lg border border-gray-300 bg-white p-3 dark:border-gray-600 dark:bg-gray-800" required />
+            <button disabled={savingReview} className="rounded-lg bg-primary-600 px-5 py-2 font-semibold text-white disabled:opacity-60">{savingReview ? 'Сохранение…' : 'Оставить отзыв'}</button>
+          </form>
+          <div className="space-y-4">
+            {reviews.map((review) => <article key={review.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+              <div className="flex items-center justify-between gap-3"><strong>{review.userName}</strong><span className="flex items-center gap-1 text-amber-500"><Star size={15} className="fill-current" />{review.rating}/5</span></div>
+              <p className="mt-2 whitespace-pre-wrap text-gray-600 dark:text-gray-300">{review.text}</p>
+            </article>)}
+            {!reviews.length && <p className="text-sm text-gray-500">Пока отзывов нет — оставьте первый.</p>}
+          </div>
+        </div>
+      </section>
     </section>
   )
 }

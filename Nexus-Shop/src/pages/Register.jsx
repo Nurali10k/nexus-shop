@@ -87,6 +87,18 @@ export default function Register() {
     }
   };
 
+  const handleGithubRegister = async () => {
+    try {
+      const { auth, githubProvider, signInWithPopup } = await import('../firebase');
+      const { user } = await signInWithPopup(auth, githubProvider);
+      dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName || user.email, email: user.email, avatar: user.photoURL }));
+      dispatch(addToast({ message: 'Регистрация через GitHub выполнена', type: 'success' }));
+      navigate('/');
+    } catch (error) {
+      dispatch(addToast({ message: `GitHub: ${error.code === 'auth/operation-not-allowed' ? 'включите провайдер GitHub в Firebase Authentication и добавьте OAuth Client ID/Secret.' : error.message}`, type: 'error' }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.password) {
@@ -296,6 +308,9 @@ export default function Register() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
               <span className="text-sm font-medium text-gray-300">Google</span>
+            </motion.button>
+            <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={handleGithubRegister} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 transition-all hover:bg-white/10">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-gray-900">GH</span><span className="text-sm font-medium text-gray-300">GitHub</span>
             </motion.button>
 
           </div>

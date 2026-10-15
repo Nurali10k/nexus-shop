@@ -3,51 +3,35 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import { loginWithFirebase } from '../../store/slices/authSlice';
 
+// Проверяем реальную Firebase-сессию, а не только состояние Redux в браузере.
 export default function ProtectedRoute({ children, adminOnly = false }) {
   const dispatch = useDispatch();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
-  const [firebaseAdmin, setFirebaseAdmin] = useState(false);
-  const [checkingFirebase, setCheckingFirebase] = useState(adminOnly);
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!adminOnly) return undefined;
-
     let active = true;
     import('../../firebase').then(async ({ auth }) => {
       await auth.authStateReady();
-      if (active) {
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser) {
-          dispatch(loginWithFirebase({
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName,
-            email: firebaseUser.email,
-            avatar: firebaseUser.photoURL
-          }));
-        }
-        setFirebaseAdmin(firebaseUser?.email === 'admin@nexus.com');
-        setCheckingFirebase(false);
-      }
+      const signedInUser = auth.currentUser;
+      if (!active) return;
+      setFirebaseUser(signedInUser);
+      if (signedInUser) dispatch(loginWithFirebase({
+        uid: signedInUser.uid,
+        name: signedInUser.displayName || signedInUser.email,
+        email: signedInUser.email,
+        avatar: signedInUser.photoURL,
+      }));
+      setChecking(false);
     }).catch(() => {
-      if (active) setCheckingFirebase(false);
+      if (active) setChecking(false);
     });
+    return () => { active = false; };
+  }, [dispatch]);
 
-    return () => {
-      active = false;
-    };
-  }, [adminOnly, dispatch]);
-
-  if (adminOnly && checkingFirebase) {
-    return <div className="p-8 text-center">Проверка доступа…</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (adminOnly && (user?.role !== 'admin' || !firebaseAdmin)) {
-    return <Navigate to="/" replace />;
-  }
-
+  if (checking) return <div className="p-8 text-center">Проверка доступа…</div>;
+  if (!firebaseUser || !isAuthenticated) return <Navigate to="/login" replace />;
+  if (adminOnly && (firebaseUser.email !== 'admin@nexus.com' || user?.role !== 'admin')) return <Navigate to="/" replace />;
   return children;
 }

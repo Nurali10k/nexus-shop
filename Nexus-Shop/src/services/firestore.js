@@ -9,7 +9,9 @@ import {
   writeBatch,
   query,
   where,
-  runTransaction
+  runTransaction,
+  serverTimestamp,
+  setDoc
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { defaultProducts } from "../store/defaultProducts";
@@ -123,8 +125,9 @@ export const addOrderToFirestore = async (order) => {
     const docRef = await addDoc(collection(db, "orders"), {
       ...order,
       userId: user.uid,
-      createdAt: order.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      // Время записи задаёт Firestore, поэтому часы устройства не сдвигают дату.
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
 
     console.info('[Firestore] Заказ создан', { id: docRef.id });
@@ -165,4 +168,31 @@ export const updateOrderInFirestore = async (id, updates) => {
 
 export const deleteOrderFromFirestore = async (id) => {
   await deleteDoc(doc(db, "orders", String(id)));
+};
+
+// Отзывы хранятся в Firestore и доступны всем посетителям для чтения.
+export const subscribeToProductReviews = (productId, onData, onError) => onSnapshot(
+  collection(db, 'reviews'),
+  (snapshot) => {
+    const reviews = snapshot.docs
+      .map((reviewDoc) => ({ id: reviewDoc.id, ...reviewDoc.data() }))
+      .filter((review) => String(review.productId) === String(productId))
+      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    onData(reviews);
+  },
+  onError
+);
+
+export const saveProductReview = async ({ productId, rating, text }) => {
+  const reviewer = auth.currentUser;
+  if (!reviewer) throw new Error('Войдите в аккаунт, чтобы оставить отзыв.');
+  const reviewId = `${String(productId).replaceAll('/', '_')}_${reviewer.uid}`;
+  await setDoc(doc(db, 'reviews', reviewId), {
+    productId: String(productId),
+    userId: reviewer.uid,
+    userName: reviewer.displayName || reviewer.email || 'Покупатель',
+    rating: Math.min(5, Math.max(1, Number(rating))),
+    text: String(text).trim(),
+    createdAt: serverTimestamp(),
+  });
 };

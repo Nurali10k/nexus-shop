@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Sun, User, LogOut, ShoppingCart, Heart, Menu, X } from 'lucide-react';
+import { Moon, Sun, User, LogOut, ShoppingCart, Heart } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
 import { addToast, setTheme, setLanguage } from '../../store/slices/uiSlice';
+import BurgerMenu from './BurgerMenu';
 
 export default function Header() {
   const dispatch = useDispatch();
@@ -150,31 +151,21 @@ export default function Header() {
             </Link>
           )}
 
-          {/* Mobile menu */}
-          <button onClick={() => setMobileMenu(!mobileMenu)} className="md:hidden p-2 text-slate-300">
-            {mobileMenu ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          <BurgerMenu
+            open={mobileMenu}
+            onToggle={() => setMobileMenu((open) => !open)}
+            onNavigate={() => setMobileMenu(false)}
+            links={[
+              { to: '/', label: t.home },
+              { to: '/shop', label: t.shop },
+              { to: '/my-orders', label: t.orders, visible: Boolean(user) },
+              { to: '/support', label: t.support },
+              { to: '/admin', label: t.admin, visible: user?.role === 'admin' },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileMenu && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="md:hidden border-t border-slate-800 bg-slate-900"
-          >
-            <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
-              <Link to="/" onClick={() => setMobileMenu(false)} className="px-4 py-2 text-slate-300 hover:bg-slate-800 rounded-lg">{t.home}</Link>
-              <Link to="/shop" onClick={() => setMobileMenu(false)} className="px-4 py-2 text-slate-300 hover:bg-slate-800 rounded-lg">{t.shop}</Link>
-              {user && <Link to="/my-orders" onClick={() => setMobileMenu(false)} className="px-4 py-2 text-slate-300 hover:bg-slate-800 rounded-lg">{t.orders}</Link>}
-              <Link to="/support" onClick={() => setMobileMenu(false)} className="px-4 py-2 text-slate-300 hover:bg-slate-800 rounded-lg">{t.support}</Link>
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </header>
   );
 }

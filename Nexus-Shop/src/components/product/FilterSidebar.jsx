@@ -4,7 +4,9 @@ const getProducts = () => {
   try {
     const stored = localStorage.getItem('nexus_products');
     if (stored) return JSON.parse(stored);
-  } catch {}
+  } catch {
+    return null;
+  }
   return null;
 };
 

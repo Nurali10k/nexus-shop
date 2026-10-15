@@ -19,9 +19,9 @@ const supportSlice = createSlice({
   reducers: {
     addMessage: (state, action) => {
       state.messages.push({
-        id: Date.now(),
+        id: Date.now() + Math.random(),
         ...action.payload,
-        timestamp: new Date().toISOString(),
+        timestamp: action.payload.timestamp || new Date().toISOString(),
         read: false
       });
       localStorage.setItem('nexus_support', JSON.stringify(state.messages));
@@ -48,15 +48,6 @@ const supportSlice = createSlice({
     }
   }
 });
-addMessage: (state, action) => {
-  state.messages.push({
-    id: Date.now() + Math.random(),
-    ...action.payload,
-    timestamp: action.payload.timestamp || new Date().toISOString(),
-    read: false
-  });
-  localStorage.setItem('nexus_support', JSON.stringify(state.messages));
-}
 
 export const { addMessage, markAsRead, deleteMessage, toggleSupport, clearMessages } = supportSlice.actions;
 export default supportSlice.reducer;

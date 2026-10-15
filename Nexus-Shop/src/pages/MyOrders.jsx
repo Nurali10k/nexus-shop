@@ -6,6 +6,7 @@ import { ShoppingBag, Clock, CheckCircle, Truck, XCircle, Package } from 'lucide
 import { replaceOrders } from '../store/slices/ordersSlice';
 import { addToast } from '../store/slices/uiSlice';
 import { t } from '../i18n/translations';
+import { formatProjectDate, formatProjectTime } from '../utils/dates';
 
 export default function MyOrders() {
   const dispatch = useDispatch();
@@ -52,6 +53,7 @@ export default function MyOrders() {
   }, [dispatch, language]);
 
   const statusLabels = {
+    reserved: language === 'en' ? 'Reserved' : language === 'kg' ? 'Брондолгон' : 'Бронь',
     'Новый': t('statusNew', language),
     'В сборке': t('statusProcessing', language),
     'В пути': t('statusShipped', language),
@@ -65,6 +67,7 @@ export default function MyOrders() {
 
   const getStatusIcon = (status) => {
     const icons = {
+      reserved: <Clock size={20} className="text-amber-500" />,
       'Новый': <Clock size={20} className="text-blue-500" />,
       'В сборке': <Package size={20} className="text-yellow-500" />,
       'В пути': <Truck size={20} className="text-purple-500" />,
@@ -76,6 +79,7 @@ export default function MyOrders() {
 
   const getStatusColor = (status) => {
     const colors = {
+      reserved: 'bg-amber-500',
       'Новый': 'bg-blue-500',
       'В сборке': 'bg-yellow-500',
       'В пути': 'bg-purple-500',
@@ -123,7 +127,8 @@ export default function MyOrders() {
                 <div>
                   <h3 className="font-bold text-lg">{t('orderLabel', language)} #{order.id}</h3>
                   <p className="text-sm text-gray-500">
-                    {new Date(order.createdAt).toLocaleString(language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
+                    {formatProjectDate(order.createdAt, language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
+                    {order.reserveUntil && <span className="mt-1 block text-sm font-medium text-amber-700 dark:text-amber-300">Бронь действует до: {formatProjectDate(order.reserveUntil, language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -140,7 +145,7 @@ export default function MyOrders() {
                   <div className="flex flex-wrap gap-2">
                     {order.statusHistory.map((h, i) => (
                       <span key={i} className="text-xs bg-white dark:bg-gray-600 px-2 py-1 rounded">
-                        {statusLabels[h.status] || h.status} • {new Date(h.date).toLocaleTimeString(language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
+                        {statusLabels[h.status] || h.status} • {formatProjectTime(h.date, language === 'kg' ? 'ky-KG' : language === 'en' ? 'en-US' : 'ru-RU')}
                       </span>
                     ))}
                   </div>

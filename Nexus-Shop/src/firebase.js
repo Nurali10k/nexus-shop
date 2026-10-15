@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAYww8En0RKfyHKLI7lgiMuGKc_IqYhZ_M",
@@ -15,8 +16,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+const githubProvider = new GithubAuthProvider();
+githubProvider.addScope('user:email');
 
-export { app, auth, db, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult };
+export { app, auth, db, storage, googleProvider, githubProvider, signInWithPopup, signInWithRedirect, getRedirectResult };

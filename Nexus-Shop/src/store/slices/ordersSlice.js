@@ -12,6 +12,30 @@ export const createOrder = createAsyncThunk('orders/createOrder', async (order) 
   return { ...order, id };
 });
 
+// Создаёт бронь товара на 24 часа и сохраняет её как обычный заказ Firestore.
+export const reserveProduct = createAsyncThunk('orders/reserveProduct', async (product, { getState }) => {
+  const user = getState().auth.user;
+  if (!user?.id) throw new Error('Войдите в аккаунт, чтобы забронировать товар.');
+
+  const createdAt = new Date().toISOString();
+  const reservation = {
+    name: user.name || user.email,
+    phone: '',
+    address: '',
+    payment: 'reserved',
+    items: [{ id: product.id, name: product.name, price: product.price, quantity: 1 }],
+    total: product.price,
+    status: 'reserved',
+    reserveUntil: Date.now() + (24 * 60 * 60 * 1000),
+    statusHistory: [{ status: 'reserved', date: createdAt }],
+    createdAt,
+  };
+
+  const { addOrderToFirestore } = await import('../../services/firestore');
+  const id = await addOrderToFirestore(reservation);
+  return { ...reservation, id, userId: user.id };
+});
+
 export const updateOrder = createAsyncThunk('orders/updateOrder', async ({ id, ...order }) => {
   const { updateOrderInFirestore } = await import('../../services/firestore');
   return updateOrderInFirestore(id, order);
@@ -66,6 +90,18 @@ const ordersSlice = createSlice({
         else state.items[index] = action.payload;
       })
       .addCase(createOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message;
+      })
+      .addCase(reserveProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(reserveProduct.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items.push(action.payload);
+      })
+      .addCase(reserveProduct.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message;
       })
