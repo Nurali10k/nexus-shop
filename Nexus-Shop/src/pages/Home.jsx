@@ -1,8 +1,10 @@
 import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, ShieldCheck, Truck, Zap } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import ProductGrid from '../components/product/ProductGrid'
+import BenefitsSection from '../components/layout/BenefitsSection'
+import SectionHeading from '../components/layout/SectionHeading'
 import { t } from '../i18n/translations'
 
 export default function Home() {
@@ -27,15 +29,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className="bg-gray-100 py-8 dark:bg-gray-800">
-        <div className="container mx-auto grid gap-5 px-4 sm:grid-cols-3">
-          {[{ icon: Zap, title: 'fastDelivery', detail: 'fastDeliveryDesc' }, { icon: ShieldCheck, title: 'officialWarranty', detail: 'officialWarrantyDesc' }, { icon: Truck, title: 'freeDelivery', detail: 'freeDeliveryDesc' }].map(({ icon: Icon, title, detail }) => (
-            <div key={title} className="flex items-center gap-4 rounded-2xl bg-white p-5 dark:bg-gray-900"><Icon className="text-primary-600" size={30} /><div><h2 className="font-semibold">{t(title, language)}</h2><p className="text-sm text-gray-500">{t(detail, language)}</p></div></div>
-          ))}
-        </div>
-      </section>
+      <BenefitsSection />
       <section className="page-shell">
-        <div className="mb-6 flex items-end justify-between gap-4"><div><p className="mb-2 text-sm uppercase tracking-widest text-primary-600">{t('whyNexus', language)}</p><h2 className="text-3xl font-bold">{t('home.featured', language)}</h2></div><Link to="/shop" className="text-sm font-semibold text-primary-600 hover:underline">{t('shopAll', language)}</Link></div>
+        <SectionHeading eyebrow={t('whyNexus', language)} title={t('home.featured', language)} linkLabel={t('shopAll', language)} />
         <ProductGrid products={products.slice(0, 4)} />
       </section>
     </>

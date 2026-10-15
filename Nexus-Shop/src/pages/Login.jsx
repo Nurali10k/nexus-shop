@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { loginWithFirebase, clearError } from '../store/slices/authSlice';
 import { addToast } from '../store/slices/uiSlice';
+import { linkPendingGithubCredential, savePendingGithubCredential } from '../services/accountLinking';
 
 export default function Login() {
   const dispatch = useDispatch();
@@ -23,7 +24,7 @@ export default function Login() {
 
       const redirectResult = await getRedirectResult(auth);
       if (redirectResult?.user) {
-        const user = redirectResult.user;
+        const { user } = await linkPendingGithubCredential(redirectResult.user);
         dispatch(loginWithFirebase({
           uid: user.uid,
           name: user.displayName,
@@ -62,7 +63,8 @@ export default function Login() {
     try {
       const { auth } = await import('../firebase');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const { user } = await signInWithEmailAndPassword(auth, form.email, form.password);
+      const result = await signInWithEmailAndPassword(auth, form.email, form.password);
+      const { user } = await linkPendingGithubCredential(result.user);
       dispatch(loginWithFirebase({
         uid: user.uid,
         name: user.displayName,
@@ -89,7 +91,7 @@ export default function Login() {
     try {
       const { signInWithPopup, googleProvider, auth: firebaseAuth } = await import('../firebase');
       const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const user = result.user;
+      const { user } = await linkPendingGithubCredential(result.user);
       dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL }));
       dispatch(addToast({ message: `Добро пожаловать, ${user.displayName}!`, type: 'success' }));
     } catch (error) {
@@ -127,6 +129,11 @@ export default function Login() {
       dispatch(addToast({ message: 'Вход через GitHub выполнен', type: 'success' }));
       navigate('/');
     } catch (error) {
+      if (error.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(error)) {
+        const email = error.customData?.email || error.email || '';
+        dispatch(addToast({ message: `Аккаунт ${email} уже существует. Войдите через Google или email/пароль с этим адресом — GitHub привяжется автоматически.`, type: 'info' }));
+        return;
+      }
       dispatch(addToast({ message: `GitHub: ${error.code === 'auth/operation-not-allowed' ? 'включите GitHub в Firebase Authentication и добавьте OAuth Client ID/Secret.' : error.message}`, type: 'error' }));
     }
   };

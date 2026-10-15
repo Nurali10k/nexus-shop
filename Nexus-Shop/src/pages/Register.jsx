@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { loginWithFirebase, clearError } from '../store/slices/authSlice';
 import { addToast } from '../store/slices/uiSlice';
+import { linkPendingGithubCredential, savePendingGithubCredential } from '../services/accountLinking';
 
 export default function Register() {
   const dispatch = useDispatch();
@@ -22,7 +23,7 @@ export default function Register() {
 
       const redirectResult = await getRedirectResult(auth);
       if (redirectResult?.user) {
-        const user = redirectResult.user;
+        const { user } = await linkPendingGithubCredential(redirectResult.user);
         dispatch(loginWithFirebase({
           uid: user.uid,
           name: user.displayName,
@@ -63,7 +64,8 @@ export default function Register() {
   const handleGoogleRegister = async () => {
     try {
       const { auth, googleProvider, signInWithPopup } = await import('../firebase');
-      const { user } = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const { user } = await linkPendingGithubCredential(result.user);
       dispatch(loginWithFirebase({
         uid: user.uid,
         name: user.displayName,
@@ -95,6 +97,12 @@ export default function Register() {
       dispatch(addToast({ message: 'Регистрация через GitHub выполнена', type: 'success' }));
       navigate('/');
     } catch (error) {
+      if (error.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(error)) {
+        const email = error.customData?.email || error.email || '';
+        dispatch(addToast({ message: `Аккаунт ${email} уже существует. Войдите через прежний способ входа — GitHub привяжется автоматически.`, type: 'info' }));
+        navigate('/login');
+        return;
+      }
       dispatch(addToast({ message: `GitHub: ${error.code === 'auth/operation-not-allowed' ? 'включите провайдер GitHub в Firebase Authentication и добавьте OAuth Client ID/Secret.' : error.message}`, type: 'error' }));
     }
   };
