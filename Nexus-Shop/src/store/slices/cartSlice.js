@@ -21,12 +21,16 @@ const cartSlice = createSlice({
   reducers: {
     addToCart: (state, action) => {
       const product = action.payload;
+      const requestedQuantity = Math.max(1, Number(product.quantity) || 1);
       const existing = state.items.find(i => i.id === product.id);
+      const stockLimit = Number(product.stock);
       
       if (existing) {
-        existing.quantity += 1;
+        existing.quantity = Number.isFinite(stockLimit) && stockLimit > 0
+          ? Math.min(stockLimit, existing.quantity + requestedQuantity)
+          : existing.quantity + requestedQuantity;
       } else {
-        state.items.push({ ...product, quantity: 1 });
+        state.items.push({ ...product, quantity: requestedQuantity });
       }
       
       localStorage.setItem('nexus_cart', JSON.stringify(state.items));

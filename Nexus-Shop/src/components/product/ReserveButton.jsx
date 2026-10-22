@@ -35,7 +35,7 @@ export default function ReserveButton({ product }) {
   }
 
   return (
-    <button type="button" onClick={handleReserve} disabled={product.stock < 1 || isReserving} className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50">
+    <button type="button" aria-label={`${copy.label}: ${product.name}`} onClick={handleReserve} disabled={product.stock < 1 || isReserving} className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50">
       {isReserving ? '…' : copy.label}
     </button>
   )

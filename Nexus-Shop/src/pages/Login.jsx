@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { auth, googleProvider, githubProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from '../firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { ensureUserProfile } from '../services/collections';
 import { loginWithFirebase, clearError } from '../store/slices/authSlice';
 import { addToast } from '../store/slices/uiSlice';
 import { linkPendingGithubCredential, savePendingGithubCredential } from '../services/accountLinking';
@@ -13,181 +16,94 @@ export default function Login() {
   const { error } = useSelector((state) => state.auth);
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const finishSignIn = async (firebaseUser) => {
+    const { user } = await linkPendingGithubCredential(firebaseUser);
+    dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL }));
+    navigate('/');
+    ensureUserProfile(user).catch((cause) => {
+      console.error('[User profile] Sync failed:', cause.message);
+      dispatch(addToast({ message: 'Вход выполнен, но профиль не синхронизирован. Опубликуйте актуальные Firestore rules.', type: 'error' }));
+    });
+  };
 
   useEffect(() => {
     let active = true;
-    import('../firebase').then(async ({ auth, getRedirectResult }) => {
+    const restoreRedirect = async () => {
       await auth.authStateReady();
-
-      if (!active) return;
-
-      const redirectResult = await getRedirectResult(auth);
-      if (redirectResult?.user) {
-        const { user } = await linkPendingGithubCredential(redirectResult.user);
-        dispatch(loginWithFirebase({
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          avatar: user.photoURL
-        }));
-        navigate('/');
-        return;
-      }
-
-      if (auth.currentUser) {
-        const user = auth.currentUser;
-        dispatch(loginWithFirebase({
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          avatar: user.photoURL
-        }));
-        navigate('/');
-      }
-    }).catch((error) => {
-      if (active) dispatch(addToast({ message: `Не удалось проверить Firebase: ${error.message}`, type: 'error' }));
-    });
-
-    return () => {
-      active = false;
+      const result = await getRedirectResult(auth);
+      if (active && result?.user) await finishSignIn(result.user);
+      else if (active && auth.currentUser) await finishSignIn(auth.currentUser);
     };
-  }, [dispatch, navigate]);
+    restoreRedirect().catch((cause) => active && dispatch(addToast({ message: `Не удалось войти: ${cause.message}`, type: 'error' })));
+    return () => { active = false; };
+  }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.email || !form.password) {
-      setShake(true); setTimeout(() => setShake(false), 500); return;
-    }
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     dispatch(clearError());
+    setLoading(true);
     try {
-      const { auth } = await import('../firebase');
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const result = await signInWithEmailAndPassword(auth, form.email, form.password);
-      const { user } = await linkPendingGithubCredential(result.user);
-      dispatch(loginWithFirebase({
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        avatar: user.photoURL
-      }));
-      dispatch(addToast({ message: 'Вы вошли в аккаунт', type: 'success' }));
-    } catch (error) {
+      const result = await signInWithEmailAndPassword(auth, form.email.trim(), form.password);
+      await finishSignIn(result.user);
+      dispatch(addToast({ message: 'Вы вошли в аккаунт.', type: 'success' }));
+    } catch (cause) {
       const messages = {
         'auth/invalid-credential': 'Неверный email или пароль.',
         'auth/user-not-found': 'Аккаунт с таким email не найден.',
         'auth/wrong-password': 'Неверный пароль.',
         'auth/operation-not-allowed': 'В Firebase не включён вход по email и паролю.',
-        'auth/unauthorized-domain': `Домен ${window.location.hostname} не разрешён в Firebase. Добавьте его в Authentication → Settings → Authorized domains.`
       };
-      dispatch(addToast({
-        message: messages[error.code] || `Не удалось войти: ${error.message}`,
-        type: 'error'
-      }));
+      dispatch(addToast({ message: messages[cause.code] || `Не удалось войти: ${cause.message}`, type: 'error' }));
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleProviderLogin = async (provider, name) => {
+    setLoading(true);
     try {
-      const { signInWithPopup, googleProvider, auth: firebaseAuth } = await import('../firebase');
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const { user } = await linkPendingGithubCredential(result.user);
-      dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL }));
-      dispatch(addToast({ message: `Добро пожаловать, ${user.displayName}!`, type: 'success' }));
-    } catch (error) {
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-        try {
-          const { signInWithRedirect, googleProvider, auth: firebaseAuth } = await import('../firebase');
-          await signInWithRedirect(firebaseAuth, googleProvider);
-          dispatch(addToast({ message: 'Google-авторизация открылась в новом окне. Вернитесь сюда после входа.', type: 'info' }));
-          return;
-        } catch (redirectError) {
-          dispatch(addToast({ message: `Не удалось открыть Google-авторизацию: ${redirectError.message}`, type: 'error' }));
-          return;
-        }
+      const result = await signInWithPopup(auth, provider);
+      await finishSignIn(result.user);
+      dispatch(addToast({ message: `Вход через ${name} выполнен.`, type: 'success' }));
+    } catch (cause) {
+      if (cause.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(cause)) {
+        dispatch(addToast({ message: 'Войдите прежним способом, чтобы связать аккаунт GitHub.', type: 'info' }));
+      } else if (cause.code === 'auth/popup-blocked' || cause.code === 'auth/cancelled-popup-request') {
+        try { await signInWithRedirect(auth, provider); }
+        catch (redirectError) { dispatch(addToast({ message: `Не удалось открыть ${name}: ${redirectError.message}`, type: 'error' })); }
+      } else {
+        dispatch(addToast({ message: `Не удалось войти через ${name}: ${cause.message}`, type: 'error' }));
       }
-
-      const messages = {
-        'auth/unauthorized-domain': `Домен ${window.location.hostname} не разрешён в Firebase. Добавьте его в Authentication → Settings → Authorized domains.`,
-        'auth/popup-blocked': 'Браузер заблокировал окно Google. Разрешите всплывающие окна для сайта и проверьте Authorized domains в настройках Firebase.',
-        'auth/popup-closed-by-user': 'Окно входа Google было закрыто до завершения авторизации.'
-      };
-      dispatch(addToast({
-        message: messages[error.code] || `Не удалось войти через Google: ${error.message}`,
-        type: 'error'
-      }));
-    }
-  };
-
-  // Вход через GitHub. Провайдер должен быть включён в том Firebase-проекте,
-  // чей projectId указан в src/firebase.js.
-  const handleGithubLogin = async () => {
-    try {
-      const { auth, githubProvider, signInWithPopup } = await import('../firebase');
-      const { user } = await signInWithPopup(auth, githubProvider);
-      dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName || user.email, email: user.email, avatar: user.photoURL }));
-      dispatch(addToast({ message: 'Вход через GitHub выполнен', type: 'success' }));
-      navigate('/');
-    } catch (error) {
-      if (error.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(error)) {
-        const email = error.customData?.email || error.email || '';
-        dispatch(addToast({ message: `Аккаунт ${email} уже существует. Войдите через Google или email/пароль с этим адресом — GitHub привяжется автоматически.`, type: 'info' }));
-        return;
-      }
-      dispatch(addToast({ message: `GitHub: ${error.code === 'auth/operation-not-allowed' ? 'включите GitHub в Firebase Authentication и добавьте OAuth Client ID/Secret.' : error.message}`, type: 'error' }));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-900 via-blue-900 to-black">
-      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-white/10 backdrop-blur-lg p-8 max-w-md w-full rounded-2xl border border-purple-500/30 shadow-2xl">
-        <h1 className="text-3xl font-bold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">Вход в NEXUS</h1>
-        
-        <AnimatePresence>
-          {error && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4 text-sm flex items-center gap-2">
-              <AlertCircle size={16} /> {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <motion.form onSubmit={handleSubmit} animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : {}} transition={{ duration: 0.4 }} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input type="email" placeholder="Введите ваш email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none" required />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Пароль</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input type={showPassword ? 'text' : 'password'} placeholder="Введите пароль" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full pl-10 pr-12 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none" required />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-          </div>
-          <motion.button type="submit" whileHover={{ y: -2, boxShadow: "0 10px 25px rgba(168, 85, 247, 0.4)" }} whileTap={{ scale: 0.98 }} className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold hover:shadow-lg transition-all">Войти →</motion.button>
-        </motion.form>
-
-        <div className="mt-6">
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/20"></div></div>
-            <div className="relative flex justify-center text-xs"><span className="px-2 bg-transparent text-gray-400">ИЛИ ВОЙТИ ЧЕРЕЗ</span></div>
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={handleGoogleLogin} className="flex items-center justify-center gap-2 py-3 border border-white/20 rounded-lg bg-white/5 hover:bg-white/10 transition-all">
-              <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-              <span className="text-sm font-medium text-gray-300">Google</span>
-            </motion.button>
-            <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={handleGithubLogin} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 transition-all hover:bg-white/10">
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-gray-900">GH</span><span className="text-sm font-medium text-gray-300">GitHub</span>
-            </motion.button>
-          </div>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-black p-4">
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md rounded-2xl border border-purple-500/30 bg-white/10 p-8 shadow-2xl backdrop-blur-lg">
+        <h1 className="mb-6 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-center text-3xl font-bold text-transparent">Вход в NEXUS</h1>
+        {error && <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-200" role="alert"><AlertCircle size={17} />{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block text-sm text-gray-300">Email
+            <span className="relative mt-1 block"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input type="email" autoComplete="email" placeholder="Введите ваш email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full rounded-lg border border-white/20 bg-white/10 py-3 pl-10 pr-4 text-white outline-none focus:ring-2 focus:ring-purple-500" required /></span>
+          </label>
+          <label className="block text-sm text-gray-300">Пароль
+            <span className="relative mt-1 block"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Введите пароль" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="w-full rounded-lg border border-white/20 bg-white/10 py-3 pl-10 pr-12 text-white outline-none focus:ring-2 focus:ring-purple-500" required /><button type="button" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onClick={() => setShowPassword((shown) => !shown)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></span>
+          </label>
+          <button type="submit" disabled={loading} className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 py-3 font-bold text-white transition hover:shadow-lg disabled:opacity-60">{loading ? 'Входим…' : 'Войти'}</button>
+        </form>
+        <div className="my-5 flex items-center gap-3 text-xs text-gray-400"><span className="h-px flex-1 bg-white/20" />ИЛИ ВОЙТИ ЧЕРЕЗ<span className="h-px flex-1 bg-white/20" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" disabled={loading} onClick={() => handleProviderLogin(googleProvider, 'Google')} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 text-sm text-gray-200 transition hover:bg-white/10 disabled:opacity-60">
+            <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.9c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.38 37.98 46.98 31.9 46.98 24.55Z"/><path fill="#FBBC05" d="M10.53 28.59a14.4 14.4 0 0 1 0-9.18l-7.98-6.19a23.99 23.99 0 0 0 0 21.56l7.98-6.19Z"/><path fill="#34A853" d="M24 48c6.48 0 11.94-2.13 15.92-5.8l-7.73-6c-2.14 1.45-4.88 2.3-8.19 2.3-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>
+            <span>Google</span>
+          </button>
+          <button type="button" disabled={loading} onClick={() => handleProviderLogin(githubProvider, 'GitHub')} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 text-sm text-gray-200 transition hover:bg-white/10 disabled:opacity-60"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M12 .9a11.1 11.1 0 0 0-3.51 21.63c.56.1.76-.24.76-.54v-2.08c-3.1.67-3.76-1.31-3.76-1.31-.5-1.28-1.24-1.62-1.24-1.62-1.01-.69.08-.68.08-.68 1.11.08 1.7 1.14 1.7 1.14.99 1.7 2.61 1.21 3.25.93.1-.72.39-1.21.71-1.49-2.48-.28-5.09-1.24-5.09-5.52 0-1.22.44-2.22 1.15-3-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.05 1.14a10.6 10.6 0 0 1 5.55 0c2.12-1.44 3.05-1.14 3.05-1.14.61 1.53.23 2.67.12 2.95.71.78 1.14 1.78 1.14 3 0 4.29-2.61 5.24-5.1 5.51.4.35.76 1.03.76 2.08v3.09c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9Z" /></svg><span>GitHub</span></button>
         </div>
-        <p className="text-center mt-6 text-gray-400 text-sm">Нет аккаунта? <Link to="/register" className="text-purple-400 hover:underline font-semibold">Зарегистрироваться</Link></p>
+        <p className="mt-6 text-center text-sm text-gray-400">Нет аккаунта? <Link to="/register" className="font-semibold text-purple-400 hover:underline">Зарегистрироваться</Link></p>
       </motion.div>
     </div>
   );

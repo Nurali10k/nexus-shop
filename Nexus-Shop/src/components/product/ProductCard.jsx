@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion'
+﻿import { motion, useReducedMotion } from 'framer-motion'
 import { Heart } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
@@ -31,7 +31,7 @@ export default function ProductCard({ product }) {
       <div className="p-4">
         <p className="mb-1 text-xs uppercase tracking-wider text-primary-600">{product.category ? t(product.category, language) : t('noCategory', language)}</p>
         <ProductTitle product={product} />
-        <div className="my-3"><StarRating rating={product.rating} size={15} /></div>
+        <div className="my-3 flex items-center gap-2"><StarRating rating={product.avgRating || 0} size={15} /><span className="text-xs text-gray-500">{Number(product.reviewCount || 0)}</span></div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ProductPrice price={product.price} className="text-lg" />
           <div className="flex gap-2">

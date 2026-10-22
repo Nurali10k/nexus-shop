@@ -7,12 +7,10 @@ import { replaceOrders, updateOrder, removeOrder, setStatusFilter } from '../../
 import { replaceProducts, createProduct, updateProduct, removeProduct } from '../../store/slices/productsSlice';
 import { addToast } from '../../store/slices/uiSlice';
 import { t } from '../../i18n/translations';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../firebase';
 import Pagination from '../../components/ui/Pagination';
-import Skeleton from '../../components/ui/Skeleton';
 import Input from '../../components/ui/Input';
 import { formatProjectDate } from '../../utils/dates';
+import AdminUserTable from '../../components/admin/AdminUserTable';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 const STATUSES = ['all', 'reserved', 'Новый', 'В сборке', 'В пути', 'Доставлен', 'Отменён'];
@@ -25,10 +23,9 @@ export default function Dashboard() {
   const language = useSelector((state) => state.ui.language);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [ordersPage, setOrdersPage] = useState(1);
-  const [imageUploading, setImageUploading] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', category: 'headphones', price: 0, rating: 5, image: '', description: '', stock: 0 });
+  const [productForm, setProductForm] = useState({ name: '', category: 'headphones', price: 0, image: '', description: '', stock: 0 });
 
   useEffect(() => {
     let active = true;
@@ -92,9 +89,14 @@ export default function Dashboard() {
   }, {});
   const pieData = Object.entries(categoryData).map(([name, value]) => ({ name, value }));
   const statusLabel = (status) => {
-    if (status === 'reserved') return 'Бронь';
     const keys = {
       all: 'statusAll',
+      reserved: 'statusReserved',
+      new: 'statusNew',
+      processing: 'statusProcessing',
+      shipped: 'statusShipped',
+      delivered: 'statusDelivered',
+      cancelled: 'statusCancelled',
       'Новый': 'statusNew',
       'В сборке': 'statusProcessing',
       'В пути': 'statusShipped',
@@ -116,7 +118,7 @@ export default function Dashboard() {
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
-    if (imageUploading || !productForm.image) return;
+    if (!productForm.image.trim()) return;
     try {
       if (editingProduct) {
         await dispatch(updateProduct({ id: editingProduct.id, ...productForm })).unwrap();
@@ -127,37 +129,12 @@ export default function Dashboard() {
       }
       setShowProductModal(false);
       setEditingProduct(null);
-      setProductForm({ name: '', category: 'headphones', price: 0, rating: 5, image: '', description: '', stock: 0 });
+      setProductForm({ name: '', category: 'headphones', price: 0, image: '', description: '', stock: 0 });
     } catch (error) {
       dispatch(addToast({ message: `${t('saveProductFailed', language)} ${error.message}`, type: 'error' }));
     }
   };
 
-  // Загружает фото в Firebase Storage и записывает ссылку в состояние формы.
-  const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-      dispatch(addToast({ message: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u0440\u0430\u0437\u043c\u0435\u0440\u043e\u043c \u0434\u043e 5 \u041c\u0411.', type: 'error' }));
-      event.target.value = '';
-      return;
-    }
-
-    setImageUploading(true);
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const imageRef = ref(storage, `products/${Date.now()}-${safeName}`);
-      const uploadedImage = await uploadBytes(imageRef, file, { contentType: file.type });
-      const imageUrl = await getDownloadURL(uploadedImage.ref);
-      setProductForm((current) => ({ ...current, image: imageUrl }));
-      dispatch(addToast({ message: '\u0418\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043e.', type: 'success' }));
-    } catch (error) {
-      dispatch(addToast({ message: `\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435: ${error.message}`, type: 'error' }));
-    } finally {
-      setImageUploading(false);
-      event.target.value = '';
-    }
-  };
   const handleEditProduct = (product) => {
     setEditingProduct(product);
     setProductForm(product);
@@ -187,12 +164,12 @@ export default function Dashboard() {
   };
 
   const getStatusColor = (status) => {
-    const colors = { reserved: 'bg-amber-500', 'Новый': 'bg-blue-500', 'В сборке': 'bg-yellow-500', 'В пути': 'bg-purple-500', 'Доставлен': 'bg-green-500', 'Отменён': 'bg-red-500' };
+    const colors = { reserved: 'bg-purple-600', 'Новый': 'bg-blue-500', new: 'bg-blue-500', 'В сборке': 'bg-cyan-600', processing: 'bg-cyan-600', 'В пути': 'bg-indigo-500', shipped: 'bg-indigo-500', 'Доставлен': 'bg-emerald-600', delivered: 'bg-emerald-600', 'Отменён': 'bg-red-500', cancelled: 'bg-red-500' };
     return colors[status] || 'bg-gray-500';
   };
 
   const statCards = [
-    { icon: DollarSign, label: t('adminRevenue', language), value: `${stats.revenue.toLocaleString()} ₽`, color: 'from-green-500 to-emerald-600' },
+    { icon: DollarSign, label: t('adminRevenue', language), value: `${stats.revenue.toLocaleString()} сом`, color: 'from-green-500 to-emerald-600' },
     { icon: ShoppingCart, label: t('adminOrders', language), value: stats.orders, color: 'from-blue-500 to-cyan-600' },
     { icon: Package, label: t('adminProducts', language), value: stats.products, color: 'from-purple-500 to-pink-600' },
     { icon: Users, label: t('adminCustomers', language), value: stats.customers, color: 'from-orange-500 to-red-600' }
@@ -203,14 +180,14 @@ export default function Dashboard() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold">{t('adminDashboard', language)}</h1>
         {activeTab === 'products' && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { setEditingProduct(null); setProductForm({ name: '', category: 'headphones', price: 0, rating: 5, image: '', description: '', stock: 0 }); setShowProductModal(true); }} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl font-bold flex items-center gap-2">
+        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { setEditingProduct(null); setProductForm({ name: '', category: 'headphones', price: 0, image: '', description: '', stock: 0 }); setShowProductModal(true); }} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl font-bold flex items-center gap-2">
             <Plus size={20} /> {t('addProduct', language)}
           </motion.button>
         )}
       </div>
 
       <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">
-        {[{ id: 'dashboard', label: t('adminStats', language) }, { id: 'orders', label: t('adminOrders', language) }, { id: 'products', label: t('adminProducts', language) }].map(tab => (
+        {[{ id: 'dashboard', label: t('adminStats', language) }, { id: 'orders', label: t('adminOrders', language) }, { id: 'products', label: t('adminProducts', language) }, { id: 'users', label: t('adminUsers', language) }].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-6 py-3 font-semibold transition-all ${activeTab === tab.id ? 'text-purple-500 border-b-2 border-purple-500' : 'text-gray-500 hover:text-purple-500'}`}>{tab.label}</button>
         ))}
       </div>
@@ -239,6 +216,8 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'users' && <AdminUserTable />}
+
       {activeTab === 'orders' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="flex items-center gap-2 mb-4">
@@ -254,24 +233,24 @@ export default function Dashboard() {
               </p>
             )}
             {paginatedOrders.map(order => (
-              <motion.div key={order.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className={`rounded-2xl p-4 shadow-lg ${order.status === 'reserved' ? 'border border-amber-400 bg-amber-50 dark:bg-amber-950/40' : 'bg-white dark:bg-gray-800'}`}>
+              <motion.div key={order.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className={`rounded-2xl border bg-white p-4 shadow-lg dark:bg-gray-800 ${order.status === 'reserved' ? 'border-purple-400/60 dark:border-purple-500/50' : 'border-gray-200 dark:border-gray-700'}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="font-bold">{t('orderLabel', language)} #{order.id}</h3>
                     <p className="text-sm text-gray-500">{order.name} • {order.phone}</p>
                     <p className="text-xs text-gray-400">{formatProjectDate(order.createdAt)}</p>
-                    {order.reserveUntil && <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Бронь до: {formatProjectDate(order.reserveUntil)}</p>}
+                    {order.reserveUntil && <p className="text-xs font-medium text-purple-600 dark:text-purple-300">{t('reservationUntil', language)}: {formatProjectDate(order.reserveUntil)}</p>}
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-white text-xs font-bold ${getStatusColor(order.status)}`}>{statusLabel(order.status)}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold text-white ${getStatusColor(order.status)}`}>{statusLabel(order.status)}</span>
                 </div>
                 <div className="text-sm mb-2">{order.items.map((item, idx) => (<span key={idx} className="inline-block mr-2 text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{item.name} x{item.quantity}</span>))}</div>
                 <div className="flex justify-between items-center">
-                  <span className="font-bold">{order.total.toLocaleString()} ₽</span>
+                  <span className="font-bold">{Number(order.total || 0).toLocaleString()} сом</span>
                   <div className="flex gap-2">
                     <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value)} className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm">
                       {STATUSES.filter(s => s !== 'all').map(s => (<option key={s} value={s}>{statusLabel(s)}</option>))}
                     </select>
-                    <button onClick={() => handleDeleteOrder(order.id)} className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600"><Trash2 size={16} /></button>
+                    <button type="button" aria-label={`${t('deleteOrderConfirm', language)} ${order.id}`} onClick={() => handleDeleteOrder(order.id)} className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white transition hover:bg-red-600"><Trash2 size={16} /></button>
                   </div>
                 </div>
               </motion.div>
@@ -291,8 +270,8 @@ export default function Dashboard() {
                   <h3 className="font-bold text-lg mb-2">{product.name}</h3>
                   <p className="text-sm text-gray-500 mb-2">{t(product.category, language)}</p>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-xl font-bold">{product.price.toLocaleString()} ₽</span>
-                    <span className="text-sm text-gray-500">⭐ {product.rating}</span>
+                    <span className="text-xl font-bold">{Number(product.price || 0).toLocaleString()} сом</span>
+                    <span className="text-sm text-gray-500">★ {Number(product.avgRating || 0).toFixed(1)} ({Number(product.reviewCount || 0)})</span>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => handleEditProduct(product)} className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-1"><Edit size={16} /> {t('editShort', language)}</button>
@@ -307,8 +286,8 @@ export default function Dashboard() {
 
       <AnimatePresence>
         {showProductModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowProductModal(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowProductModal(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl bg-white p-6 dark:bg-gray-800">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold">{editingProduct ? t('editProduct', language) : t('addProduct', language)}</h3>
                 <button onClick={() => setShowProductModal(false)}><X size={24} /></button>
@@ -319,16 +298,15 @@ export default function Dashboard() {
                   <option value="headphones">{t('headphones', language)}</option><option value="keyboards">{t('keyboards', language)}</option><option value="mice">{t('mice', language)}</option><option value="watches">{t('watches', language)}</option>
                 </select>
                 <Input type="number" placeholder={t('price', language)} value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required />
-                <Input type="number" placeholder={t('productRating', language)} value={productForm.rating} onChange={(e) => setProductForm({ ...productForm, rating: Number(e.target.value) })} min="1" max="5" step="0.1" />
                 <label className="block space-y-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                  <span>Изображение товара (до 5 МБ)</span>
-                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading} className="block w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-600 dark:bg-gray-700" />
-                  {imageUploading && <div className="flex items-center gap-3"><Skeleton className="h-16 w-16" /><span>Загрузка изображения...</span></div>}
-                  {!imageUploading && productForm.image && <img src={productForm.image} alt="Предпросмотр товара" className="h-24 w-24 rounded-lg object-cover" />}
+                  <span>Ссылка на изображение товара</span>
+                  <Input type="url" placeholder="https://example.com/product-image.jpg" value={productForm.image} onChange={(e) => setProductForm({ ...productForm, image: e.target.value })} required />
+                  <span className="block text-xs font-normal text-gray-500">Вставьте прямую ссылку на изображение.</span>
+                  {productForm.image && <img src={productForm.image} alt="Предпросмотр изображения товара" onError={(event) => { event.currentTarget.style.display = 'none'; }} onLoad={(event) => { event.currentTarget.style.display = 'block'; }} className="h-24 w-24 rounded-lg object-cover" />}
                 </label>
                 <Input as="textarea" placeholder={t('description', language)} value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} rows="3" required />
                 <Input type="number" placeholder={t('stockQuantity', language)} value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required />
-                <button type="submit" disabled={imageUploading || !productForm.image} className="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-bold flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"><Save size={20} /> {editingProduct ? t('saveChanges', language) : t('add', language)}</button>
+                <button type="submit" disabled={!productForm.image.trim()} className="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-bold flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"><Save size={20} /> {editingProduct ? t('saveChanges', language) : t('add', language)}</button>
               </form>
             </motion.div>
           </motion.div>

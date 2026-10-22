@@ -1,9 +1,13 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider, useSelector } from 'react-redux';
 import { useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+import { ensureUserProfile } from './services/collections';
 import { store } from './store';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
 import CartDrawer from './components/cart/CartDrawer';
 import ToastContainer from './components/ui/ToastContainer';
 import Home from './pages/Home';
@@ -16,6 +20,7 @@ import Profile from './pages/Profile';
 import Support from './pages/Support';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ProductPage from './pages/ProductPage';
 import Dashboard from './pages/admin/Dashboard';
 
 function AppContent() {
@@ -25,6 +30,10 @@ function AppContent() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  useEffect(() => onAuthStateChanged(auth, (firebaseUser) => {
+    if (firebaseUser) ensureUserProfile(firebaseUser).catch((error) => console.error('[User profile] Sync failed:', error.message));
+  }), []);
 
   const getHomeRoute = () => {
     if (!isAuthenticated) return '/';
@@ -40,6 +49,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/shop" element={<Shop />} />
+          <Route path="/product/:id" element={<ProductPage />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/wishlist" element={<Wishlist />} />
@@ -59,6 +69,7 @@ function AppContent() {
           <Route path="*" element={<Navigate to={getHomeRoute()} replace />} />
         </Routes>
       </main>
+      <Footer />
       <ToastContainer />
     </div>
   );
@@ -73,3 +84,6 @@ export default function App() {
     </Provider>
   );
 }
+
+
+

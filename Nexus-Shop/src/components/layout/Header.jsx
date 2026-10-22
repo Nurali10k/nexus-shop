@@ -18,9 +18,9 @@ export default function Header() {
   const [mobileMenu, setMobileMenu] = useState(false);
 
   const translations = {
-    ru: { home: 'Главная', shop: 'Магазин', orders: 'Мои заказы', support: 'Поддержка', login: 'Войти', logout: 'Выйти', profile: 'Профиль', admin: 'Админ', logoutError: 'Не удалось выйти из Firebase:' },
-    en: { home: 'Home', shop: 'Shop', orders: 'My Orders', support: 'Support', login: 'Login', logout: 'Logout', profile: 'Profile', admin: 'Admin', logoutError: 'Could not sign out of Firebase:' },
-    kg: { home: 'Башкы', shop: 'Дүкөн', orders: 'Менин заказдар', support: 'Колдоо', login: 'Кирүү', logout: 'Чыгуу', profile: 'Профиль', admin: 'Админ', logoutError: 'Firebase аккаунтунан чыгуу мүмкүн болгон жок:' }
+    ru: { home: 'Главная', shop: 'Магазин', orders: 'Мои заказы', support: 'Поддержка', login: 'Войти', logout: 'Выйти', profile: 'Профиль', wishlist: 'Избранное', cart: 'Корзина', admin: 'Админ', logoutError: 'Не удалось выйти из Firebase:' },
+    en: { home: 'Home', shop: 'Shop', orders: 'My Orders', support: 'Support', login: 'Login', logout: 'Logout', profile: 'Profile', wishlist: 'Wishlist', cart: 'Cart', admin: 'Admin', logoutError: 'Could not sign out of Firebase:' },
+    kg: { home: 'Башкы', shop: 'Дүкөн', orders: 'Менин заказдар', support: 'Колдоо', login: 'Кирүү', logout: 'Чыгуу', profile: 'Профиль', wishlist: 'Тандалгандар', cart: 'Себет', admin: 'Админ', logoutError: 'Firebase аккаунтунан чыгуу мүмкүн болгон жок:' }
   };
   
   const t = translations[language] || translations.ru;
@@ -43,8 +43,8 @@ export default function Header() {
     <header className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-cyan-500 bg-clip-text text-transparent">
-          NEXUS
+        <Link to="/" aria-label="NEXUS — главная" className="inline-flex items-center gap-2 text-2xl font-bold">
+          <span className="bg-gradient-to-r from-purple-500 to-cyan-500 bg-clip-text text-transparent">NEXUS</span>
         </Link>
 
         {/* Desktop Nav */}
@@ -63,9 +63,9 @@ export default function Header() {
             onChange={(e) => dispatch(setLanguage(e.target.value))}
             className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
           >
-            <option value="ru">🇷🇺 RU</option>
-            <option value="en">🇧 EN</option>
-            <option value="kg">🇰🇬 KG</option>
+            <option value="ru">RU</option>
+            <option value="en">EN</option>
+            <option value="kg">KG</option>
           </select>
 
           {/* Theme */}
@@ -73,13 +73,14 @@ export default function Header() {
             whileHover={{ scale: 1.1, rotate: 180 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => dispatch(setTheme(theme === 'dark' ? 'light' : 'dark'))}
+            aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
             className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300"
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </motion.button>
 
           {/* Wishlist */}
-          <Link to="/wishlist" className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300">
+          <Link to="/wishlist" aria-label={t.wishlist} className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300">
             <Heart size={20} />
             {wishlistItems.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
@@ -89,7 +90,7 @@ export default function Header() {
           </Link>
 
           {/* Cart */}
-          <Link to="/cart" className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300">
+          <Link to="/cart" aria-label={t.cart} className="relative p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300">
             <ShoppingCart size={20} />
             {cartItems.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs rounded-full flex items-center justify-center">

@@ -1,335 +1,126 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { loginWithFirebase, clearError } from '../store/slices/authSlice';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { motion } from 'framer-motion';
+import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { auth, googleProvider, githubProvider, signInWithPopup, getRedirectResult } from '../firebase';
+import { ensureUserProfile } from '../services/collections';
+import { loginWithFirebase } from '../store/slices/authSlice';
 import { addToast } from '../store/slices/uiSlice';
 import { linkPendingGithubCredential, savePendingGithubCredential } from '../services/accountLinking';
+
+const inputClass = 'w-full rounded-lg border border-white/20 bg-white/10 py-3 pl-10 pr-4 text-white placeholder-gray-400 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/40';
 
 export default function Register() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { error, isAuthenticated } = useSelector((state) => state.auth);
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const finishSignIn = async (firebaseUser) => {
+    const { user } = await linkPendingGithubCredential(firebaseUser);
+    dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL }));
+    navigate('/');
+    ensureUserProfile(user).catch((cause) => {
+      console.error('[User profile] Sync failed:', cause.message);
+      dispatch(addToast({ message: 'Аккаунт создан, но профиль не синхронизирован. Опубликуйте актуальные Firestore rules.', type: 'error' }));
+    });
+  };
 
   useEffect(() => {
     let active = true;
-
-    import('../firebase').then(async ({ auth, getRedirectResult }) => {
-      if (!active) return;
-
-      const redirectResult = await getRedirectResult(auth);
-      if (redirectResult?.user) {
-        const { user } = await linkPendingGithubCredential(redirectResult.user);
-        dispatch(loginWithFirebase({
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          avatar: user.photoURL
-        }));
-        navigate('/');
-        return;
-      }
-
-      if (isAuthenticated) navigate('/');
-    }).catch((error) => {
-      if (active) dispatch(addToast({ message: `Не удалось проверить Firebase: ${error.message}`, type: 'error' }));
-    });
-
-    return () => {
-      active = false;
+    const restoreRedirect = async () => {
+      await auth.authStateReady();
+      const result = await getRedirectResult(auth);
+      if (active && result?.user) await finishSignIn(result.user);
     };
-  }, [dispatch, isAuthenticated, navigate]);
+    restoreRedirect().catch((cause) => active && setError(cause.message));
+    return () => { active = false; };
+  }, []);
 
-  // Индикатор силы пароля
-  const getPasswordStrength = (password) => {
-    if (!password) return { level: 0, label: '', color: '' };
-    let score = 0;
-    if (password.length >= 6) score++;
-    if (password.length >= 10) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    
-    if (score <= 2) return { level: 1, label: 'Слабый', color: 'bg-red-500' };
-    if (score <= 3) return { level: 2, label: 'Средний', color: 'bg-yellow-500' };
-    return { level: 3, label: 'Надёжный', color: 'bg-green-500' };
-  };
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    const name = form.name.trim();
+    const email = form.email.trim().toLowerCase();
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Введите имя и корректный email.');
+    if (form.password.length < 6) return setError('Пароль должен содержать не менее 6 символов.');
+    if (form.password !== form.confirmPassword) return setError('Пароли не совпадают.');
 
-  const strength = getPasswordStrength(form.password);
-
-  const handleGoogleRegister = async () => {
+    setLoading(true);
     try {
-      const { auth, googleProvider, signInWithPopup } = await import('../firebase');
-      const result = await signInWithPopup(auth, googleProvider);
-      const { user } = await linkPendingGithubCredential(result.user);
-      dispatch(loginWithFirebase({
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        avatar: user.photoURL
-      }));
-      dispatch(addToast({ message: 'Вы вошли через Google', type: 'success' }));
-    } catch (error) {
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-        try {
-          const { auth, googleProvider, signInWithRedirect } = await import('../firebase');
-          await signInWithRedirect(auth, googleProvider);
-          dispatch(addToast({ message: 'Google-авторизация открылась в новом окне. Вернитесь сюда после входа.', type: 'info' }));
-          return;
-        } catch (redirectError) {
-          dispatch(addToast({ message: `Не удалось открыть Google-авторизацию: ${redirectError.message}`, type: 'error' }));
-          return;
-        }
-      }
-      dispatch(addToast({ message: `Не удалось войти через Google: ${error.message}`, type: 'error' }));
-    }
-  };
-
-  const handleGithubRegister = async () => {
-    try {
-      const { auth, githubProvider, signInWithPopup } = await import('../firebase');
-      const { user } = await signInWithPopup(auth, githubProvider);
-      dispatch(loginWithFirebase({ uid: user.uid, name: user.displayName || user.email, email: user.email, avatar: user.photoURL }));
-      dispatch(addToast({ message: 'Регистрация через GitHub выполнена', type: 'success' }));
-      navigate('/');
-    } catch (error) {
-      if (error.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(error)) {
-        const email = error.customData?.email || error.email || '';
-        dispatch(addToast({ message: `Аккаунт ${email} уже существует. Войдите через прежний способ входа — GitHub привяжется автоматически.`, type: 'info' }));
-        navigate('/login');
-        return;
-      }
-      dispatch(addToast({ message: `GitHub: ${error.code === 'auth/operation-not-allowed' ? 'включите провайдер GitHub в Firebase Authentication и добавьте OAuth Client ID/Secret.' : error.message}`, type: 'error' }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name || !form.email || !form.password) {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
-    dispatch(clearError());
-    if (form.email.trim().toLowerCase() === 'admin@nexus.com') {
-      dispatch(addToast({
-        message: 'Этот адрес зарезервирован для администратора. Создайте админ-аккаунт в Firebase Console.',
-        type: 'error'
-      }));
-      return;
-    }
-    try {
-      const { auth } = await import('../firebase');
-      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-      const { user } = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
-      await updateProfile(user, { displayName: form.name.trim() });
-      dispatch(loginWithFirebase({
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        avatar: user.photoURL
-      }));
-      dispatch(addToast({ message: 'Аккаунт создан', type: 'success' }));
-    } catch (error) {
+      const result = await createUserWithEmailAndPassword(auth, email, form.password);
+      await updateProfile(result.user, { displayName: name });
+      await finishSignIn(result.user);
+      dispatch(addToast({ message: 'Аккаунт создан.', type: 'success' }));
+    } catch (cause) {
       const messages = {
-        'auth/email-already-in-use': 'Аккаунт с таким email уже существует.',
-        'auth/weak-password': 'Пароль слишком простой. Используйте не менее 6 символов.',
-        'auth/operation-not-allowed': 'В Firebase не включена регистрация по email и паролю.',
-        'auth/unauthorized-domain': `Домен ${window.location.hostname} не разрешён в Firebase.`
+        'auth/email-already-in-use': 'Аккаунт с этим email уже существует. Войдите в него.',
+        'auth/weak-password': 'Выберите более надёжный пароль.',
+        'auth/invalid-email': 'Проверьте формат email.',
       };
-      dispatch(addToast({
-        message: messages[error.code] || `Не удалось создать аккаунт: ${error.message}`,
-        type: 'error'
-      }));
+      setError(messages[cause.code] || cause.message || 'Не удалось создать аккаунт.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerWithProvider = async (provider, name) => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await finishSignIn(result.user);
+      dispatch(addToast({ message: `Вход через ${name} выполнен.`, type: 'success' }));
+    } catch (cause) {
+      if (cause.code === 'auth/account-exists-with-different-credential' && savePendingGithubCredential(cause)) {
+        dispatch(addToast({ message: 'Войдите прежним способом, чтобы связать аккаунт GitHub.', type: 'info' }));
+        navigate('/login');
+      } else if (cause.code === 'auth/popup-blocked' || cause.code === 'auth/cancelled-popup-request') {
+        setError('Разрешите всплывающие окна для этого сайта и повторите попытку.');
+      } else {
+        setError(cause.message || `Не удалось войти через ${name}.`);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-900 via-blue-900 to-black">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white/10 backdrop-blur-lg p-8 max-w-md w-full rounded-2xl border border-purple-500/30 shadow-2xl"
-      >
-        <h1 className="text-3xl font-bold mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
-          Регистрация в NEXUS
-        </h1>
-        
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4 text-sm flex items-center gap-2"
-            >
-              <AlertCircle size={16} />
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <motion.form
-          onSubmit={handleSubmit}
-          animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : {}}
-          transition={{ duration: 0.4 }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Имя</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Ваше имя"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
-                required
-              />
-            </div>
-          </div>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-black p-4">
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md rounded-2xl border border-purple-500/30 bg-white/10 p-8 shadow-2xl backdrop-blur-lg">
+        <h1 className="mb-2 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-center text-3xl font-bold text-transparent">Регистрация в NEXUS</h1>
+        <p className="mb-6 text-center text-sm text-gray-300">Создайте аккаунт в NEXUS Shop</p>
+        {error && <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/15 px-4 py-3 text-sm text-red-200" role="alert"><AlertCircle size={17} className="mt-0.5 shrink-0" />{error}</div>}
 
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="email"
-                placeholder="Ваш email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
-                required
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Пароль</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Минимум 6 символов"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full pl-10 pr-12 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-            {/* Индикатор силы пароля */}
-            {form.password && (
-              <div className="mt-2">
-                <div className="flex gap-1 mb-1">
-                  {[1, 2, 3].map(i => (
-                    <div
-                      key={i}
-                      className={`h-1 flex-1 rounded-full transition-all ${
-                        i <= strength.level ? strength.color : 'bg-gray-600'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <p className={`text-xs ${
-                  strength.level === 1 ? 'text-red-400' :
-                  strength.level === 2 ? 'text-yellow-400' : 'text-green-400'
-                }`}>
-                  {strength.label}
-                </p>
-              </div>
-            )}
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block text-sm text-gray-200">Имя
+            <span className="relative mt-1 block"><User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="Ваше имя" autoComplete="name" required /></span>
+          </label>
+          <label className="block text-sm text-gray-200">Email
+            <span className="relative mt-1 block"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className={inputClass} placeholder="name@example.com" autoComplete="email" required /></span>
+          </label>
+          <label className="block text-sm text-gray-200">Пароль
+            <span className="relative mt-1 block"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className={`${inputClass} pr-12`} placeholder="Не менее 6 символов" autoComplete="new-password" minLength={6} required /><button type="button" aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} onClick={() => setShowPassword((visible) => !visible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></span>
+          </label>
+          <label className="block text-sm text-gray-200">Подтвердите пароль
+            <span className="relative mt-1 block"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={19} /><input type="password" value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} className={inputClass} placeholder="Повторите пароль" autoComplete="new-password" required /><span className="absolute right-3 top-1/2 -translate-y-1/2">{form.confirmPassword && (form.password === form.confirmPassword ? <CheckCircle size={19} className="text-green-400" /> : <AlertCircle size={19} className="text-red-400" />)}</span></span>
+          </label>
+          <button type="submit" disabled={loading} className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 py-3 font-bold text-white transition hover:shadow-lg disabled:opacity-60">{loading ? 'Создаём аккаунт…' : 'Создать аккаунт'}</button>
+        </form>
 
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Подтвердите пароль</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="password"
-                placeholder="Повторите пароль"
-                value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                className="w-full pl-10 pr-12 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
-                required
-              />
-              {form.confirmPassword && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {form.password === form.confirmPassword ? (
-                    <CheckCircle size={20} className="text-green-400" />
-                  ) : (
-                    <XCircle size={20} className="text-red-400" />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <motion.button
-            type="submit"
-            whileHover={{ y: -2, boxShadow: "0 10px 25px rgba(168, 85, 247, 0.4)" }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold hover:shadow-lg transition-all"
-          >
-            Создать аккаунт →
-          </motion.button>
-        </motion.form>
-
-        {/* Социальные кнопки */}
-        <div className="mt-6">
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/20"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-transparent text-gray-400">ИЛИ ЧЕРЕЗ</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            <motion.button
-              type="button"
-              whileHover={{ y: -2, boxShadow: "0 8px 20px rgba(66, 133, 244, 0.3)" }}
-              whileTap={{ scale: 0.97 }}
-              onClick={handleGoogleRegister}
-              className="flex items-center justify-center gap-2 py-3 border border-white/20 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              <span className="text-sm font-medium text-gray-300">Google</span>
-            </motion.button>
-            <motion.button type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={handleGithubRegister} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 transition-all hover:bg-white/10">
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-gray-900">GH</span><span className="text-sm font-medium text-gray-300">GitHub</span>
-            </motion.button>
-
-          </div>
+        <div className="my-5 flex items-center gap-3 text-xs text-gray-400"><span className="h-px flex-1 bg-white/20" />ИЛИ ПРОДОЛЖИТЬ С<span className="h-px flex-1 bg-white/20" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" disabled={loading} onClick={() => registerWithProvider(googleProvider, 'Google')} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 text-sm text-gray-200 transition hover:bg-white/10 disabled:opacity-60">
+            <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.9c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.38 37.98 46.98 31.9 46.98 24.55Z"/><path fill="#FBBC05" d="M10.53 28.59a14.4 14.4 0 0 1 0-9.18l-7.98-6.19a23.99 23.99 0 0 0 0 21.56l7.98-6.19Z"/><path fill="#34A853" d="M24 48c6.48 0 11.94-2.13 15.92-5.8l-7.73-6c-2.14 1.45-4.88 2.3-8.19 2.3-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>
+            <span>Google</span>
+          </button>
+          <button type="button" disabled={loading} onClick={() => registerWithProvider(githubProvider, 'GitHub')} className="flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 py-3 text-sm text-gray-200 transition hover:bg-white/10 disabled:opacity-60"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M12 .9a11.1 11.1 0 0 0-3.51 21.63c.56.1.76-.24.76-.54v-2.08c-3.1.67-3.76-1.31-3.76-1.31-.5-1.28-1.24-1.62-1.24-1.62-1.01-.69.08-.68.08-.68 1.11.08 1.7 1.14 1.7 1.14.99 1.7 2.61 1.21 3.25.93.1-.72.39-1.21.71-1.49-2.48-.28-5.09-1.24-5.09-5.52 0-1.22.44-2.22 1.15-3-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.05 1.14a10.6 10.6 0 0 1 5.55 0c2.12-1.44 3.05-1.14 3.05-1.14.61 1.53.23 2.67.12 2.95.71.78 1.14 1.78 1.14 3 0 4.29-2.61 5.24-5.1 5.51.4.35.76 1.03.76 2.08v3.09c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9Z" /></svg><span>GitHub</span></button>
         </div>
-        
-        <p className="text-center mt-6 text-gray-400 text-sm">
-          Уже есть аккаунт?{' '}
-          <Link to="/login" className="text-purple-400 hover:underline font-semibold">
-            Войти
-          </Link>
-        </p>
+        <p className="mt-6 text-center text-sm text-gray-400">Уже есть аккаунт? <Link to="/login" className="font-semibold text-purple-400 hover:underline">Войти</Link></p>
       </motion.div>
     </div>
   );

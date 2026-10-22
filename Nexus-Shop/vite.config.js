@@ -2,13 +2,17 @@
 import { defineConfig, loadEnv } from 'vite'
 import telegramOrderHandler from './api/telegram/order.js'
 import emailOrderHandler from './api/email/order.js'
+import saveReviewHandler from './api/reviews/save.js'
+import voteReviewHandler from './api/reviews/vote.js'
+import adminUsersHandler from './api/admin/users.js'
 
 function telegramApiPlugin() {
   return {
     name: 'telegram-order-api',
     configureServer(server) {
       const mountApi = (path, handler) => server.middlewares.use(path, async (request, response) => {
-        if (request.method === 'POST') {
+        request.query = Object.fromEntries(new URL(request.url, 'http://localhost').searchParams)
+        if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
           try {
             let rawBody = ''
             for await (const chunk of request) {
@@ -47,13 +51,19 @@ function telegramApiPlugin() {
       })
       mountApi('/api/telegram/order', telegramOrderHandler)
       mountApi('/api/email/order', emailOrderHandler)
+      mountApi('/api/reviews/save', saveReviewHandler)
+      mountApi('/api/reviews/vote', voteReviewHandler)
+      mountApi('/api/admin/users', adminUsersHandler)
     },
   }
 }
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, globalThis.process.cwd(), '')
-  for (const key of ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'RESEND_API_KEY', 'ORDER_NOTIFICATION_EMAIL', 'RESEND_FROM_EMAIL']) {
+  for (const key of [
+    'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'RESEND_API_KEY', 'ORDER_NOTIFICATION_EMAIL', 'RESEND_FROM_EMAIL',
+    'FIREBASE_PROJECT_ID', 'FIREBASE_SERVICE_ACCOUNT_JSON', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY',
+  ]) {
     if (env[key]) globalThis.process.env[key] = env[key]
   }
 

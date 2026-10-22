@@ -133,7 +133,7 @@ export default function Profile() {
           className="grid grid-cols-3 gap-4 mb-8"
         >
           {[
-            { label: t('rating', language), value: `⭐ ${user?.rating || 5}`, color: 'from-yellow-500 to-orange-500' },
+            { label: 'Аккаунт', value: user?.isActive === false ? 'Заблокирован' : 'Активен', color: 'from-green-500 to-emerald-500' },
             { label: t('role', language), value: user?.role === 'admin' ? t('adminShort', language) : t('userShort', language), color: 'from-purple-500 to-pink-500' },
             { label: t('status', language), value: t('active', language), color: 'from-green-500 to-emerald-500' }
           ].map((stat, idx) => (

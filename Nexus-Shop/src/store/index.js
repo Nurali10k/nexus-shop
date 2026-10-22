@@ -6,6 +6,8 @@ import authReducer from './slices/authSlice';
 import uiReducer from './slices/uiSlice';
 import ordersReducer from './slices/ordersSlice';
 import supportReducer from './slices/supportSlice';
+import reviewsReducer from './slices/reviewsSlice';
+import adminUsersReducer from './slices/adminUsersSlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +17,8 @@ export const store = configureStore({
     auth: authReducer,
     ui: uiReducer,
     orders: ordersReducer,
-    support: supportReducer
+    support: supportReducer,
+    reviews: reviewsReducer,
+    adminUsers: adminUsersReducer
   }
 });

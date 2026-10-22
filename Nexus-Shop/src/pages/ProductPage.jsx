@@ -1,104 +1,71 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { Link, useParams } from 'react-router-dom'
-import { Heart, ShoppingCart, Star } from 'lucide-react'
-import StarRating from '../components/ui/StarRating'
-import Button from '../components/ui/Button'
-import { addToCart } from '../store/slices/cartSlice'
-import { toggleWishlist } from '../store/slices/wishlistSlice'
-import { addToast } from '../store/slices/uiSlice'
-import { t } from '../i18n/translations'
-import { saveProductReview, subscribeToProductReviews } from '../services/firestore'
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { Heart, Minus, Plus, ShoppingCart } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import Button from '../components/ui/Button';
+import StarRating from '../components/ui/StarRating';
+import ReviewsSection from '../components/reviews/ReviewsSection';
+import { addToCart } from '../store/slices/cartSlice';
+import { toggleWishlist } from '../store/slices/wishlistSlice';
+import { addToast } from '../store/slices/uiSlice';
+import { productDescription, t } from '../i18n/translations';
 
 export default function ProductPage() {
-  const { id } = useParams()
-  const dispatch = useDispatch()
-  const product = useSelector((state) => state.products.items.find((item) => String(item.id) === id))
-  const productId = product?.id
-  const language = useSelector((state) => state.ui.language)
-  const user = useSelector((state) => state.auth.user)
-  const isInWishlist = useSelector((state) => state.wishlist.items.some((item) => item.id === product?.id))
-  const [reviews, setReviews] = useState([])
-  const [rating, setRating] = useState(5)
-  const [reviewText, setReviewText] = useState('')
-  const [savingReview, setSavingReview] = useState(false)
+  const { id } = useParams();
+  const dispatch = useDispatch();
+  const product = useSelector((state) => state.products.items.find((item) => String(item.id) === id));
+  const language = useSelector((state) => state.ui.language);
+  const isInWishlist = useSelector((state) => state.wishlist.items.some((item) => String(item.id) === String(product?.id)));
+  const [quantity, setQuantity] = useState(1);
 
-  useEffect(() => {
-    if (!productId) return undefined
-    return subscribeToProductReviews(productId, setReviews, (error) => console.error('Не удалось загрузить отзывы:', error))
-  }, [productId])
-
-  const averageRating = useMemo(() => reviews.length
-    ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
-    : Number(product?.rating || 0), [reviews, product?.rating])
-
-  if (!product) return <section className="page-shell text-center"><h1 className="text-3xl font-bold">Товар не найден</h1><Link to="/shop" className="mt-4 inline-block text-primary-600">Вернуться в каталог</Link></section>
+  if (!product) return <section className="bg-gray-900 px-4 py-20 text-center text-white"><h1 className="text-3xl font-bold">{t('noProducts', language)}</h1><Link to="/shop" className="mt-4 inline-block text-purple-400 hover:text-purple-300">{t('shop.title', language)} →</Link></section>;
 
   const addProduct = () => {
-    dispatch(addToCart(product))
-    dispatch(addToast({ message: `${product.name} добавлен в корзину`, type: 'success' }))
-  }
-
-  const submitReview = async (event) => {
-    event.preventDefault()
-    if (!user) {
-      dispatch(addToast({ message: 'Войдите в аккаунт, чтобы оставить отзыв.', type: 'info' }))
-      return
-    }
-    if (!reviewText.trim()) return
-    setSavingReview(true)
-    try {
-      await saveProductReview({ productId: product.id, rating, text: reviewText })
-      setReviewText('')
-      dispatch(addToast({ message: 'Отзыв сохранён', type: 'success' }))
-    } catch (error) {
-      dispatch(addToast({ message: error.message || 'Не удалось сохранить отзыв', type: 'error' }))
-    } finally {
-      setSavingReview(false)
-    }
-  }
+    dispatch(addToCart({ ...product, quantity }));
+    dispatch(addToast({ message: `${product.name} × ${quantity} ${t('addedToCart', language)}`, type: 'success' }));
+  };
+  const stock = Math.max(0, Number(product.stock) || 0);
+  const category = product.category ? t(product.category, language) : t('noCategory', language);
+  const description = productDescription(product, language);
 
   return (
-    <section className="page-shell">
-      <Link to="/shop" className="mb-6 inline-block text-sm text-primary-600">← {t('shop.title', language)}</Link>
-      <div className="grid gap-10 md:grid-cols-2">
-        <img src={product.image} alt={product.name} className="max-h-[520px] w-full rounded-3xl object-cover" />
-        <div className="py-4">
-          <p className="mb-3 uppercase tracking-widest text-primary-600">{product.category}</p>
-          <h1 className="mb-4 text-4xl font-bold">{product.name}</h1>
-          <StarRating rating={averageRating} />
-          <p className="my-7 leading-7 text-gray-600 dark:text-gray-300">{product.description}</p>
-          <p className="mb-6 text-3xl font-bold">{product.price.toLocaleString('ru-RU')} сом</p>
-          <p className="mb-6 text-sm text-gray-500">{t('product.inStock', language)}: {product.stock}</p>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={addProduct} disabled={product.stock < 1}><ShoppingCart className="mr-2 inline" size={18} />{t('product.addToCart', language)}</Button>
-            <Button variant="secondary" onClick={() => dispatch(toggleWishlist(product))}><Heart className={`mr-2 inline ${isInWishlist ? 'fill-red-500 text-red-500' : ''}`} size={18} />{isInWishlist ? 'В избранном' : 'В избранное'}</Button>
+    <section className="bg-gray-900 py-8 text-gray-100 sm:py-12">
+      <div className="container mx-auto px-4">
+        <Link to="/shop" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-purple-400 transition hover:text-purple-300">← {t('shop.title', language)}</Link>
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="grid min-h-[320px] place-items-center overflow-hidden rounded-2xl bg-gray-800 p-5 shadow-xl shadow-black/10 sm:min-h-[480px] sm:p-8">
+            <img src={product.image} alt={product.name} loading="lazy" className="max-h-[560px] w-full rounded-xl object-contain" />
           </div>
-        </div>
-      </div>
 
-      <section className="mt-12">
-        <h2 className="mb-4 text-2xl font-bold">{t('product.reviews', language)} ({reviews.length})</h2>
-        <div className="card p-5">
-          <div className="mb-5 flex items-center gap-2"><StarRating rating={averageRating} /><span className="text-sm text-gray-500">Средняя оценка по отзывам</span></div>
-          <form onSubmit={submitReview} className="mb-6 space-y-3">
-            <label className="block text-sm font-medium">Ваша оценка
-              <select value={rating} onChange={(event) => setRating(Number(event.target.value))} className="ml-3 rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800">
-                {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} из 5</option>)}
-              </select>
-            </label>
-            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} maxLength={1000} placeholder="Поделитесь впечатлениями о товаре" className="min-h-24 w-full rounded-lg border border-gray-300 bg-white p-3 dark:border-gray-600 dark:bg-gray-800" required />
-            <button disabled={savingReview} className="rounded-lg bg-primary-600 px-5 py-2 font-semibold text-white disabled:opacity-60">{savingReview ? 'Сохранение…' : 'Оставить отзыв'}</button>
-          </form>
-          <div className="space-y-4">
-            {reviews.map((review) => <article key={review.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-              <div className="flex items-center justify-between gap-3"><strong>{review.userName}</strong><span className="flex items-center gap-1 text-amber-500"><Star size={15} className="fill-current" />{review.rating}/5</span></div>
-              <p className="mt-2 whitespace-pre-wrap text-gray-600 dark:text-gray-300">{review.text}</p>
-            </article>)}
-            {!reviews.length && <p className="text-sm text-gray-500">Пока отзывов нет — оставьте первый.</p>}
+          <div className="flex flex-col justify-center py-2 sm:py-6">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-purple-400">{category}</p>
+            <h1 className="mb-4 text-3xl font-bold leading-tight text-white sm:text-4xl lg:text-5xl">{product.name}</h1>
+            <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-gray-400">
+              <StarRating rating={Number(product.avgRating || 0)} size={16} />
+              <span>({Number(product.reviewCount || 0)} {t('product.reviews', language).toLowerCase()})</span>
+            </div>
+            {description && <p className="mb-6 max-w-xl text-base leading-7 text-gray-300">{description}</p>}
+            <p className="mb-3 text-3xl font-bold text-white">{Number(product.price || 0).toLocaleString('ru-RU')} сом</p>
+            <p className="mb-6 text-sm text-gray-400">{t('product.inStock', language)}: {stock}</p>
+
+            <div className="mb-6 flex flex-wrap items-center gap-4">
+              <span className="font-medium text-gray-200">{t('quantity', language)}</span>
+              <div className="inline-flex items-center overflow-hidden rounded-xl border border-gray-700 bg-gray-800">
+                <button type="button" aria-label={t('decreaseQuantity', language)} onClick={() => setQuantity((current) => Math.max(1, current - 1))} disabled={quantity <= 1} className="p-3 text-gray-300 transition hover:text-purple-400 disabled:opacity-40"><Minus size={16} /></button>
+                <output className="min-w-10 text-center font-semibold" aria-live="polite">{quantity}</output>
+                <button type="button" aria-label={t('increaseQuantity', language)} onClick={() => setQuantity((current) => Math.min(stock || 1, current + 1))} disabled={quantity >= stock} className="p-3 text-gray-300 transition hover:text-purple-400 disabled:opacity-40"><Plus size={16} /></button>
+              </div>
+              <span className="text-sm text-gray-500">{t('available', language)}: {stock}</span>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={addProduct} disabled={stock < 1}><ShoppingCart className="mr-2 inline" size={18} />{t('product.addToCart', language)}</Button>
+              <Button variant="secondary" onClick={() => dispatch(toggleWishlist(product))}><Heart className={`mr-2 inline ${isInWishlist ? 'fill-red-500 text-red-500' : ''}`} size={18} />{t(isInWishlist ? 'removeFromWishlist' : 'addToWishlist', language)}</Button>
+            </div>
           </div>
         </div>
-      </section>
+        <div className="mt-12 sm:mt-16"><ReviewsSection productId={product.id} product={product} /></div>
+      </div>
     </section>
-  )
+  );
 }

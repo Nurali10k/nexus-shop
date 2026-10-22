@@ -1,0 +1,40 @@
+export type UserRole = 'customer' | 'admin';
+export type UserProfile = {
+  uid: string; email: string; displayName: string; photoURL: string | null;
+  role: UserRole; createdAt: unknown; lastLoginAt: unknown; isActive: boolean;
+};
+export type Address = { userId: string; street: string; city: string; zipCode: string; country: string; isDefault: boolean; label: string };
+export type Wishlist = { userId: string; productIds: string[]; updatedAt: unknown };
+export type UserPreferences = { userId: string; theme: 'light' | 'dark'; language: 'ru' | 'en' | 'kg'; notificationsEnabled: boolean };
+export type Category = { name: string; slug: string; parentId: string | null; imageUrl?: string; description?: string };
+export type Brand = { name: string; logoUrl?: string; website?: string; description?: string };
+export type Tag = { name: string; colorHex: string };
+export type ProductVariant = { productId: string; sku: string; attributes: Record<string, string>; priceModifier: number; stockCount: number };
+export type InventoryLog = { productId: string; changeAmount: number; reason: 'restock' | 'sale' | 'adjustment'; adminId: string; timestamp: unknown };
+export type CartItem = { userId: string; productId: string; quantity: number; addedAt: unknown; selectedVariantId?: string };
+export type Product = { name: string; category: string; categoryId?: string; brandId?: string; price: number; image: string; description: string; stock: number; avgRating: number; reviewCount: number; legacyRating?: number; tagIds?: string[]; updatedAt?: unknown };
+export type Order = { userId: string; items: Array<{ id?: string | number; productId?: string; name: string; price: number; quantity: number }>; total: number; status: string; createdAt: unknown; updatedAt?: unknown; addressId?: string; paymentId?: string };
+export type OrderItem = { orderId: string; productId: string; quantity: number; unitPrice: number; productName: string; image?: string; selectedVariantId?: string };
+export type Payment = { orderId: string; amount: number; currency: string; method: 'card' | 'cash' | 'crypto'; status: 'pending' | 'completed' | 'failed' | 'refunded'; transactionId?: string; gatewayResponse?: unknown; paidAt?: unknown };
+export type Shipment = { orderId: string; carrier: string; trackingNumber?: string; estimatedDelivery?: unknown; currentStatus: string; history: Array<{ status: string; location?: string; timestamp: unknown }> };
+export type Invoice = { orderId: string; pdfUrl: string; issuedAt: unknown; taxDetails?: Record<string, unknown> };
+export type ReturnRequest = { orderId: string; userId: string; reason: string; photos: string[]; status: 'requested' | 'approved' | 'rejected' | 'processed'; refundAmount?: number; createdAt: unknown };
+export type Review = { productId: string; userId: string; userName: string; userPhotoURL?: string | null; rating: number; comment: string; text?: string; images: string[]; helpfulVotes: number; verifiedPurchase: boolean; createdAt: unknown; updatedAt?: unknown };
+export type ReviewVote = { reviewId: string; userId: string; value: 1 | -1; updatedAt: unknown };
+export type Notification = { userId: string; type: 'order_update' | 'promo' | 'review_reply'; title: string; message: string; read: boolean; linkTo?: string; createdAt: unknown };
+export type SupportTicket = { userId: string; subject: string; messages: Array<{ sender: string; text: string; timestamp: unknown }>; status: 'open' | 'closed'; assignedToAdminId?: string; priority: 'low' | 'normal' | 'high' };
+export type ActivityFeedItem = { type: 'purchase' | 'review' | 'signup'; actorId: string; targetId?: string; metadata?: Record<string, unknown>; timestamp: unknown };
+export type SiteSettings = { siteName: string; maintenanceMode: boolean; defaultCurrency: string; taxRate: number; freeShippingThreshold: number };
+export type AnalyticsDaily = { date: string; totalRevenue: number; orderCount: number; newUserCount: number; topProducts: Array<{ productId: string; count: number }> };
+export type AuditLog = { adminId: string; action: 'update_price' | 'delete_product' | 'ban_user' | 'change_role' | 'update_user'; targetType: string; targetId: string; oldValue?: unknown; newValue?: unknown; ipHash?: string; timestamp: unknown };
+export type Promotion = { code: string; discountType: 'percent' | 'fixed'; value: number; validFrom: unknown; validUntil: unknown; applicableCategories: string[]; usageLimit?: number; usedCount: number };
+export type ChatMessage = { sessionId: string; userId: string; sender: 'user' | 'ai' | 'admin'; text: string; timestamp: unknown; contextData?: Record<string, unknown> };
+
+export type CollectionModels = {
+  users: UserProfile; addresses: Address; wishlist: Wishlist; user_preferences: UserPreferences;
+  categories: Category; brands: Brand; tags: Tag; product_variants: ProductVariant; inventory_logs: InventoryLog;
+  cart_items: CartItem; products: Product; orders: Order; order_items: OrderItem; payments: Payment; shipments: Shipment; invoices: Invoice;
+  returns_requests: ReturnRequest; reviews: Review; review_votes: ReviewVote; notifications: Notification;
+  support_tickets: SupportTicket; activity_feed: ActivityFeedItem; settings: SiteSettings; analytics_daily: AnalyticsDaily;
+  audit_logs: AuditLog; promotions: Promotion; chat_messages: ChatMessage;
+};

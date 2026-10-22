@@ -1,4 +1,4 @@
-import ProductCard from './ProductCard'
+﻿import ProductCard from './ProductCard'
 
 export default function ProductGrid({ products }) {
   if (products.length === 0) return <p className="py-16 text-center text-gray-500">Товары не найдены.</p>

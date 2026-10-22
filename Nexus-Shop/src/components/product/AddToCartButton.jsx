@@ -14,7 +14,7 @@ export default function AddToCartButton({ product }) {
   }
 
   return (
-    <button type="button" onClick={handleAdd} disabled={product.stock < 1} aria-label={`${t('product.addToCart', language)}: ${product.name}`} className="rounded-lg bg-primary-600 p-2 text-white transition hover:bg-primary-700 disabled:opacity-50">
+    <button type="button" onClick={handleAdd} disabled={product.stock < 1} aria-label={`${t('product.addToCart', language)}: ${product.name}`} className="rounded-lg bg-primary-600 p-2 text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
       <ShoppingCart size={18} />
     </button>
   )

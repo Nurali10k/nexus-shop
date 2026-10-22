@@ -1,4 +1,4 @@
-export const translations = {
+﻿export const translations = {
   ru: {
     // Header
     home: 'Главная',
@@ -19,6 +19,10 @@ export const translations = {
     addedToCart: 'добавлен в корзину',
     addToCart: 'Добавить в корзину',
     inStock: 'В наличии',
+    quantity: 'Количество',
+    decreaseQuantity: 'Уменьшить количество',
+    increaseQuantity: 'Увеличить количество',
+    available: 'Доступно',
     reviews: 'Отзывы',
     viewAll: 'Весь каталог →',
     fastDelivery: 'Быстрая доставка',
@@ -88,7 +92,6 @@ export const translations = {
     enterCode: 'Введите 4-значный код',
     back: 'Назад',
     confirm: 'Подтвердить ✓',
-    demoVerificationCode: 'Код подтверждения: {code}\n(В демо-версии код показан в окне сообщения)',
     invalidCode: 'Неверный код!',
     orderPlaced: 'Заказ оформлен!',
     orderFailed: 'Не удалось оформить заказ:',
@@ -151,6 +154,7 @@ export const translations = {
     adminStats: 'Статистика',
     adminOrders: 'Заказы',
     adminProducts: 'Товары',
+    adminUsers: 'Пользователи',
     adminRevenue: 'Выручка',
     adminCustomers: 'Клиенты',
     ordersByStatus: 'Заказы по статусам',
@@ -191,6 +195,8 @@ export const translations = {
     ordersLoadFailedAdmin: 'Не удалось загрузить заказы:',
     category: 'Категория',
     statusAll: 'Все',
+    statusReserved: 'Бронь',
+    reservationUntil: 'Бронь до',
     statusNew: 'Новый',
     statusProcessing: 'В сборке',
     statusShipped: 'В пути',
@@ -223,6 +229,10 @@ export const translations = {
     addedToCart: 'added to cart',
     addToCart: 'Add to cart',
     inStock: 'In stock',
+    quantity: 'Quantity',
+    decreaseQuantity: 'Decrease quantity',
+    increaseQuantity: 'Increase quantity',
+    available: 'Available',
     reviews: 'Reviews',
     viewAll: 'View all →',
     fastDelivery: 'Fast delivery',
@@ -292,7 +302,6 @@ export const translations = {
     enterCode: 'Enter the 4-digit code',
     back: 'Back',
     confirm: 'Confirm ✓',
-    demoVerificationCode: 'Verification code: {code}\n(In this demo, the code is shown in a message box)',
     invalidCode: 'Incorrect code!',
     orderPlaced: 'Order placed!',
     orderFailed: 'Could not place the order:',
@@ -355,6 +364,7 @@ export const translations = {
     adminStats: 'Statistics',
     adminOrders: 'Orders',
     adminProducts: 'Products',
+    adminUsers: 'Users',
     adminRevenue: 'Revenue',
     adminCustomers: 'Customers',
     ordersByStatus: 'Orders by status',
@@ -395,6 +405,8 @@ export const translations = {
     ordersLoadFailedAdmin: 'Could not load orders:',
     category: 'Category',
     statusAll: 'All',
+    statusReserved: 'Reserved',
+    reservationUntil: 'Reserved until',
     statusNew: 'New',
     statusProcessing: 'Processing',
     statusShipped: 'Shipped',
@@ -427,6 +439,10 @@ export const translations = {
     addedToCart: 'себетке кошулду',
     addToCart: 'Себетке кошуу',
     inStock: 'Кампада бар',
+    quantity: 'Саны',
+    decreaseQuantity: 'Санын азайтуу',
+    increaseQuantity: 'Санын көбөйтүү',
+    available: 'Жеткиликтүү',
     reviews: 'Сын-пикирлер',
     viewAll: 'Баардык каталог →',
     fastDelivery: 'Тез жеткирүү',
@@ -496,7 +512,6 @@ export const translations = {
     enterCode: '4 орундуу кодду киргизиңиз',
     back: 'Артка',
     confirm: 'Ырастоо ✓',
-    demoVerificationCode: 'Ырастоо коду: {code}\n(Демо-нускада код билдирүү терезесинде көрсөтүлөт)',
     invalidCode: 'Код туура эмес!',
     orderPlaced: 'Заказ кабыл алынды!',
     orderFailed: 'Заказды тариздөө мүмкүн болгон жок:',
@@ -559,6 +574,7 @@ export const translations = {
     adminStats: 'Статистика',
     adminOrders: 'Заказдар',
     adminProducts: 'Товарлар',
+    adminUsers: 'Колдонуучулар',
     adminRevenue: 'Киреше',
     adminCustomers: 'Кардарлар',
     ordersByStatus: 'Статус боюнча заказдар',
@@ -599,6 +615,8 @@ export const translations = {
     ordersLoadFailedAdmin: 'Заказдарды жүктөө мүмкүн болгон жок:',
     category: 'Категория',
     statusAll: 'Баары',
+    statusReserved: 'Бронь',
+    reservationUntil: 'Брондоо мөөнөтү',
     statusNew: 'Жаңы',
     statusProcessing: 'Даярдалууда',
     statusShipped: 'Жолдо',
@@ -631,3 +649,34 @@ export const t = (key, language = 'ru') => {
     || translations.ru[translationKey]
     || key;
 };
+
+const defaultProductDescriptions = {
+  'Sony WH-1000XM5': {
+    en: 'Premium wireless headphones with advanced noise cancellation and up to 30 hours of battery life.',
+    kg: 'Өркүндөтүлгөн ызы-чууну басаңдатуусу жана 30 саатка чейинки батареясы бар премиум зымсыз кулакчындар.',
+  },
+  'Keychron K2 Pro': {
+    en: 'A mechanical keyboard with hot-swappable switches, Bluetooth, and wired connectivity.',
+    kg: 'Свичтерин алмаштырууга мүмкүн болгон, Bluetooth жана зымдуу туташуусу бар механикалык баскычтоп.',
+  },
+  'Logitech G Pro X': {
+    en: 'A lightweight gaming mouse with a HERO 25K sensor, designed for precise control.',
+    kg: 'Так башкаруу үчүн HERO 25K сенсору бар жеңил оюн чычканы.',
+  },
+  'Apple Watch Ultra 2': {
+    en: 'A rugged smartwatch with a titanium case, GPS, and water resistance for outdoor adventures.',
+    kg: 'Сырткы сапарларга ылайыкталган титан корпусу, GPS жана сууга туруктуулугу бар акылдуу саат.',
+  },
+  'Marshall Major IV': {
+    en: 'Classic over-ear headphones with a vintage design and more than 80 hours of battery life.',
+    kg: 'Ретро дизайны жана 80 сааттан ашык батареясы бар классикалык кулакчындар.',
+  },
+  'Razer DeathAdder V3': {
+    en: 'An ergonomic gaming mouse with a precise Focus Pro 30K optical sensor.',
+    kg: 'Так Focus Pro 30K оптикалык сенсору бар эргономикалык оюн чычканы.',
+  },
+};
+
+export const productDescription = (product, language = 'ru') => (
+  defaultProductDescriptions[product?.name]?.[language] || product?.description || ''
+);

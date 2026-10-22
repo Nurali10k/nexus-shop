@@ -5,16 +5,25 @@ import {
   updateDoc, 
   deleteDoc, 
   doc,
+  getDoc,
   onSnapshot,
   writeBatch,
   query,
   where,
   runTransaction,
   serverTimestamp,
-  setDoc
+  setDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { defaultProducts } from "../store/defaultProducts";
+
+const categorySlug = (value) => String(value || 'uncategorized').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'uncategorized';
+const withFirestoreRulesHint = (error, action) => {
+  const permissionDenied = error?.code === 'permission-denied'
+    || String(error?.message || '').toLowerCase().includes('missing or insufficient permissions');
+  if (!permissionDenied) return error;
+  return new Error(`Firebase rules blocked ${action}. Publish the current firestore.rules from Nexus-Shop: firebase deploy --only firestore:rules,firestore:indexes,storage.`);
+};
 
 export const seedDefaultProductsIfEmpty = async () => {
   if (auth.currentUser?.email !== 'admin@nexus.com') return false;
@@ -24,9 +33,13 @@ export const seedDefaultProductsIfEmpty = async () => {
   if (!snapshot.empty) return false;
 
   const batch = writeBatch(db);
+  const categories = new Map();
   defaultProducts.forEach(({ id, ...product }) => {
-    batch.set(doc(productsRef, `default-${id}`), product);
+    const categoryId = categorySlug(product.category);
+    categories.set(categoryId, product.category);
+    batch.set(doc(productsRef, `default-${id}`), { ...product, categoryId, avgRating: 0, reviewCount: 0 });
   });
+  categories.forEach((name, id) => batch.set(doc(db, 'categories', id), { name, slug: id, parentId: null }, { merge: true }));
   await batch.commit();
   return true;
 };
@@ -60,12 +73,16 @@ export const subscribeToProducts = (onData, onError) => {
 };
 
 export const addProductToFirestore = async (product) => {
-  const docRef = await addDoc(collection(db, "products"), product);
+  const categoryId = categorySlug(product.category);
+  const docRef = await addDoc(collection(db, "products"), { ...product, categoryId, avgRating: 0, reviewCount: 0 });
+  await setDoc(doc(db, 'categories', categoryId), { name: product.category, slug: categoryId, parentId: null }, { merge: true });
   return docRef.id;
 };
 
 export const updateProductInFirestore = async (id, product) => {
-  await updateDoc(doc(db, "products", String(id)), product);
+  const categoryId = categorySlug(product.category);
+  await updateDoc(doc(db, "products", String(id)), { ...product, categoryId });
+  await setDoc(doc(db, 'categories', categoryId), { name: product.category, slug: categoryId, parentId: null }, { merge: true });
 };
 
 export const deleteProductFromFirestore = async (id) => {
@@ -73,41 +90,50 @@ export const deleteProductFromFirestore = async (id) => {
 };
 
 // ===== ЗАКАЗЫ =====
-const getVisibleOrdersQuery = (user = auth.currentUser) => {
+const getVisibleOrdersQuery = async (user = auth.currentUser) => {
   if (!user) {
     throw new Error('Войдите через Firebase, чтобы просматривать заказы.');
   }
 
   const ordersRef = collection(db, "orders");
-  return user.email === 'admin@nexus.com'
-    ? ordersRef
-    : query(ordersRef, where('userId', '==', user.uid));
+  let isAdmin = user.email?.toLowerCase() === 'admin@nexus.com';
+  try {
+    const cachedUser = JSON.parse(localStorage.getItem('nexus_current_user') || 'null');
+    isAdmin ||= cachedUser?.id === user.uid && cachedUser?.role === 'admin';
+  } catch { /* Firestore still enforces admin access to an unfiltered query. */ }
+  try {
+    const userProfile = await getDoc(doc(db, 'users', user.uid));
+    isAdmin ||= userProfile.data()?.role === 'admin';
+  } catch (error) {
+    // A profile read failure should not prevent customers from reading their own orders.
+    console.warn('[Firestore] Could not read user role; loading only this account’s orders:', error.message);
+  }
+  return isAdmin ? ordersRef : query(ordersRef, where('userId', '==', user.uid));
 };
 
 export const getOrdersFromFirestore = async () => {
-  const querySnapshot = await getDocs(getVisibleOrdersQuery());
-  return querySnapshot.docs.map(orderDoc => ({
-    id: orderDoc.id,
-    ...orderDoc.data()
-  }));
+  try {
+    const querySnapshot = await getDocs(await getVisibleOrdersQuery());
+    return querySnapshot.docs.map(orderDoc => ({
+      id: orderDoc.id,
+      ...orderDoc.data()
+    }));
+  } catch (error) {
+    throw withFirestoreRulesHint(error, 'loading orders');
+  }
 };
 
 export const subscribeToOrders = (onData, onError, user = auth.currentUser) => {
-  let ordersQuery;
-  try {
-    ordersQuery = getVisibleOrdersQuery(user);
-  } catch (error) {
-    onError(error);
-    return () => {};
-  }
-  return onSnapshot(
-    ordersQuery,
-    snapshot => onData(snapshot.docs.map(orderDoc => ({
+  let unsubscribe = () => {};
+  let cancelled = false;
+  getVisibleOrdersQuery(user).then((ordersQuery) => {
+    if (cancelled) return;
+    unsubscribe = onSnapshot(ordersQuery, snapshot => onData(snapshot.docs.map(orderDoc => ({
       id: orderDoc.id,
       ...orderDoc.data()
-    }))),
-    onError
-  );
+    }))), (error) => onError(withFirestoreRulesHint(error, 'loading orders')));
+  }).catch((error) => onError(withFirestoreRulesHint(error, 'loading orders')));
+  return () => { cancelled = true; unsubscribe(); };
 };
 
 export const addOrderToFirestore = async (order) => {
@@ -122,22 +148,63 @@ export const addOrderToFirestore = async (order) => {
       total: order.total
     });
 
-    const docRef = await addDoc(collection(db, "orders"), {
+    const orderRef = doc(collection(db, "orders"));
+    const paymentId = orderRef.id;
+    const shipmentId = orderRef.id;
+    const batch = writeBatch(db);
+    const now = serverTimestamp();
+    const items = Array.isArray(order.items) ? order.items : [];
+
+    batch.set(orderRef, {
       ...order,
       userId: user.uid,
-      // Время записи задаёт Firestore, поэтому часы устройства не сдвигают дату.
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      paymentId,
+      shipmentId,
+      createdAt: now,
+      updatedAt: now
     });
+    items.forEach((item, index) => {
+      const quantity = Math.max(1, Number(item.quantity) || 1);
+      const price = Number(item.price) || 0;
+      batch.set(doc(db, "order_items", `${orderRef.id}_${index}`), {
+        orderId: orderRef.id,
+        userId: user.uid,
+        productId: String(item.productId || item.id || ''),
+        name: String(item.name || item.title || ''),
+        quantity,
+        unitPrice: price,
+        subtotal: price * quantity,
+        createdAt: now
+      });
+    });
+    batch.set(doc(db, "payments", paymentId), {
+      orderId: orderRef.id,
+      userId: user.uid,
+      amount: Number(order.total) || 0,
+      currency: order.currency || 'KZT',
+      method: ['card', 'cash', 'crypto'].includes(order.paymentMethod || order.payment) ? (order.paymentMethod || order.payment) : 'cash',
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    });
+    batch.set(doc(db, "shipments", shipmentId), {
+      orderId: orderRef.id,
+      userId: user.uid,
+      currentStatus: order.status || 'new',
+      history: [{ status: order.status || 'new', createdAt: Date.now() }],
+      createdAt: now,
+      updatedAt: now
+    });
+    await batch.commit();
 
-    console.info('[Firestore] Заказ создан', { id: docRef.id });
-    return docRef.id;
+    console.info('[Firestore] Order created', { id: orderRef.id });
+    return orderRef.id;
   } catch (error) {
     console.error('[Firestore] Не удалось создать заказ', {
       code: error.code,
       message: error.message
     });
-    throw error;
+    throw withFirestoreRulesHint(error, 'placing the order');
   }
 };
 
@@ -171,28 +238,3 @@ export const deleteOrderFromFirestore = async (id) => {
 };
 
 // Отзывы хранятся в Firestore и доступны всем посетителям для чтения.
-export const subscribeToProductReviews = (productId, onData, onError) => onSnapshot(
-  collection(db, 'reviews'),
-  (snapshot) => {
-    const reviews = snapshot.docs
-      .map((reviewDoc) => ({ id: reviewDoc.id, ...reviewDoc.data() }))
-      .filter((review) => String(review.productId) === String(productId))
-      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-    onData(reviews);
-  },
-  onError
-);
-
-export const saveProductReview = async ({ productId, rating, text }) => {
-  const reviewer = auth.currentUser;
-  if (!reviewer) throw new Error('Войдите в аккаунт, чтобы оставить отзыв.');
-  const reviewId = `${String(productId).replaceAll('/', '_')}_${reviewer.uid}`;
-  await setDoc(doc(db, 'reviews', reviewId), {
-    productId: String(productId),
-    userId: reviewer.uid,
-    userName: reviewer.displayName || reviewer.email || 'Покупатель',
-    rating: Math.min(5, Math.max(1, Number(rating))),
-    text: String(text).trim(),
-    createdAt: serverTimestamp(),
-  });
-};

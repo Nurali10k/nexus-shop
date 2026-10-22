@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
-import { Filter } from 'lucide-react'
+import { Filter, Search, Headphones, Keyboard, Mouse, Watch } from 'lucide-react'
 import { setFilter, setSearchQuery, setSortBy, replaceProducts } from '../store/slices/productsSlice'
 import { addToCart } from '../store/slices/cartSlice'
 import { addToWishlist, removeFromWishlist } from '../store/slices/wishlistSlice'
@@ -15,12 +15,12 @@ import EmptyProducts from '../components/product/EmptyProducts'
 import ShopProductCard from '../components/product/ShopProductCard'
 
 const CATEGORIES = [
-  { id: 'all', translationKey: 'allProducts', icon: '🛍️' },
-  { id: 'headphones', translationKey: 'headphones', icon: '🎧' },
-  { id: 'keyboards', translationKey: 'keyboards', icon: '⌨️' },
-  { id: 'mice', translationKey: 'mice', icon: '🖱️' },
-  { id: 'watches', translationKey: 'watches', icon: '⌚' },
-]
+  { id: 'all', translationKey: 'allProducts', Icon: Search },
+  { id: 'headphones', translationKey: 'headphones', Icon: Headphones },
+  { id: 'keyboards', translationKey: 'keyboards', Icon: Keyboard },
+  { id: 'mice', translationKey: 'mice', Icon: Mouse },
+  { id: 'watches', translationKey: 'watches', Icon: Watch },
+];
 const SORT_OPTIONS = [
   { id: 'popular', translationKey: 'sortByPopularity' },
   { id: 'price-asc', translationKey: 'sortByPriceAsc' },
@@ -59,7 +59,7 @@ export default function Shop() {
   }).sort((a, b) => {
     if (sortBy === 'price-asc') return a.price - b.price
     if (sortBy === 'price-desc') return b.price - a.price
-    if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0)
+    if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0)
     return 0
   })
 
@@ -78,17 +78,17 @@ export default function Shop() {
     dispatch(addToast({ message: t(exists ? 'removedFromWishlist' : 'addedToWishlist', language), type: 'info' }))
   }
 
-  return <div className="min-h-screen bg-gray-50 py-8 dark:bg-gray-900">
+  return <div className="min-h-screen bg-gray-900 py-8 text-gray-100">
     <div className="container mx-auto px-4">
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="mb-2 text-4xl font-bold text-gray-900 dark:text-white">{t('shopTitle', language)}</h1>
-        <p className="text-gray-500 dark:text-gray-400">{t('shopSubtitle', language)}</p>
+        <h1 className="mb-2 text-4xl font-bold text-white">{t('shopTitle', language)}</h1>
+        <p className="text-gray-400">{t('shopSubtitle', language)}</p>
       </motion.header>
 
       <div className="mb-8 flex flex-col gap-4 md:flex-row">
         <ProductSearch value={searchQuery} onChange={(value) => dispatch(setSearchQuery(value))} placeholder={t('searchPlaceholder', language)} />
         <ProductSortSelect value={sortBy} options={SORT_OPTIONS} onChange={(value) => dispatch(setSortBy(value))} translate={(key) => t(key, language)} />
-        <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-white md:hidden"><Filter size={20} />{t('filters', language)}</button>
+        <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-white transition hover:bg-purple-700 md:hidden"><Filter size={18} />{t('filters', language)}</button>
       </div>
 
       <CategoryFilter categories={CATEGORIES} selected={filter} onSelect={(category) => dispatch(setFilter(category))} translate={(key) => t(key, language)} visible={showFilters} />
@@ -101,3 +101,7 @@ export default function Shop() {
     </div>
   </div>
 }
+
+
+
+

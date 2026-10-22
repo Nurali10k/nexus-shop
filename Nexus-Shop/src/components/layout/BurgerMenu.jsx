@@ -5,15 +5,15 @@ import { Link } from 'react-router-dom'
 export default function BurgerMenu({ open, onToggle, onNavigate, links }) {
   return (
     <>
-      <button type="button" aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} onClick={onToggle} className="p-2 text-slate-300 md:hidden">
+      <button type="button" aria-label={open ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={open} onClick={onToggle} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-gray-400 transition-colors hover:text-primary-500 md:hidden">
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="absolute left-0 right-0 top-full overflow-hidden border-t border-slate-800 bg-slate-900 md:hidden">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="absolute left-0 right-0 top-full overflow-hidden border-t border-gray-700 bg-gray-900 md:hidden">
             <nav className="container mx-auto flex flex-col gap-2 px-4 py-4">
               {links.filter((link) => link.visible !== false).map((link) => (
-                <Link key={link.to} to={link.to} onClick={onNavigate} className="rounded-lg px-4 py-2 text-slate-300 hover:bg-slate-800">
+                <Link key={link.to} to={link.to} onClick={onNavigate} className="rounded-lg px-4 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white">
                   {link.label}
                 </Link>
               ))}

@@ -48,16 +48,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     loginWithFirebase: (state, action) => {
-      const { name, email, avatar, uid } = action.payload;
+      const { name, email, avatar, uid, role, isActive } = action.payload;
       const users = getUsers();
       const existingUser = users.find(u => u.email === email);
       const user = {
         id: uid,
         name: name || existingUser?.name || email,
         email,
-        role: email === 'admin@nexus.com' ? 'admin' : 'user',
+        role: role === 'admin' || email?.toLowerCase() === 'admin@nexus.com' ? 'admin' : 'customer',
+        isActive: isActive ?? existingUser?.isActive ?? true,
         avatar: avatar || existingUser?.avatar || null,
-        rating: existingUser?.rating || 5,
         createdAt: existingUser?.createdAt || new Date().toISOString()
       };
       const userIndex = users.findIndex(existing => existing.email === email);
